@@ -9,7 +9,7 @@
   },
   "author": "Hugo Woodiwiss <hj.woodiwiss@gmail.com>",
   "dependencies": {
-    "learn-wgpu": "file:../wgpu-testbed-lib/pkg"
+    "wgpu-testbed-lib": "file:../wgpu-testbed-lib/pkg"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^5.0.0",

@@ -1,3 +1,3 @@
-import * as wasm from "learn-wgpu";
+import * as wasm from "wgpu-testbed-lib";
 
 wasm.run_wasm();
