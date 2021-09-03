@@ -75,6 +75,21 @@ pub struct Model {
     pub materials: Vec<Material>,
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct ComputeInfo {
+    num_vertices: u32,
+    num_indices: u32,
+}
+
+struct BitangentComputeBinding {
+    src_vertex_buffer: wgpu::Buffer,
+    dst_vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    info_buffer: wgpu::Buffer,
+    compute_info: ComputeInfo,
+}
+
 impl Model {
     pub async fn load<P: AsRef<Path>>(
         device: &wgpu::Device,
