@@ -10,7 +10,7 @@ use wgpu::PowerPreference;
 use winit::{event::WindowEvent, window::Window};
 
 use crate::camera::Camera;
-use crate::model::{self, DrawLight};
+use crate::model::{self, DrawLight, ModelLoader};
 use crate::model::{DrawModel, Model};
 use crate::texture::{self, Texture};
 use crate::vertex::Vertex;
@@ -233,14 +233,17 @@ impl State {
                 push_constant_ranges: &[],
             });
 
-        let obj_model = Model::load(
-            &device,
-            &queue,
-            &texture_bind_group_layout,
-            "resources/cube/cube.obj",
-        )
-        .await
-        .unwrap();
+        let model_loader = ModelLoader::new(&device).await;
+
+        let obj_model = model_loader
+            .load(
+                &device,
+                &queue,
+                &texture_bind_group_layout,
+                "resources/cube/cube.obj",
+            )
+            .await
+            .unwrap();
 
         const SPACE_BETWEEN: f32 = 3.0;
         let instances = (0..INSTANCES_PER_ROW)

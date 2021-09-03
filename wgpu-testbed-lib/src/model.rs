@@ -1,9 +1,9 @@
-use std::{ops::Range, path::Path};
-
 use anyhow::*;
 use cgmath::{Vector2, Vector3};
+use std::{ops::Range, path::Path};
 
 use crate::file_reader::FileReader;
+use crate::pipeline;
 use crate::texture::Texture;
 use crate::vertex::Vertex;
 
@@ -70,11 +70,6 @@ pub struct Mesh {
     pub material: usize,
 }
 
-pub struct Model {
-    pub meshes: Vec<Mesh>,
-    pub materials: Vec<Material>,
-}
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct ComputeInfo {
@@ -90,13 +85,118 @@ struct BitangentComputeBinding {
     compute_info: ComputeInfo,
 }
 
-impl Model {
+impl pipeline::Bindable for BitangentComputeBinding {
+    fn layout_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
+        vec![
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ]
+    }
+
+    fn bind_group_entries(&self) -> Vec<wgpu::BindGroupEntry> {
+        vec![
+            //Src Verts
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: self.src_vertex_buffer.as_entire_binding(),
+            },
+            //Dst Verts
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: self.dst_vertex_buffer.as_entire_binding(),
+            },
+            //Index Buffer
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: self.index_buffer.as_entire_binding(),
+            },
+            //Compute info buffer
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: self.info_buffer.as_entire_binding(),
+            },
+        ]
+    }
+}
+
+pub struct Model {
+    pub meshes: Vec<Mesh>,
+    pub materials: Vec<Material>,
+}
+
+pub struct ModelLoader {
+    binder: pipeline::Binder<BitangentComputeBinding>,
+    pipeline: wgpu::ComputePipeline,
+}
+
+impl ModelLoader {
+    pub async fn new(device: &wgpu::Device) -> Self {
+        let binder = pipeline::Binder::new(device, Some("ModelLoader Binder"));
+
+        let shader_buffer = FileReader::read_file("shaders/compute_bitangents.wgsl").await;
+        let shader_str =
+            std::str::from_utf8(shader_buffer.as_slice()).expect("Failed to load shader");
+
+        let shader = wgpu::ShaderModuleDescriptor {
+            source: wgpu::ShaderSource::Wgsl(shader_str.into()),
+            label: Some("Bitangent Compute Shader Module"),
+        };
+
+        let pipeline = pipeline::create_compute_pipeline(
+            device,
+            &[&binder.layout],
+            &shader,
+            Some("ModelLoader Compute Pipeline"),
+        );
+
+        Self { binder, pipeline }
+    }
+
     pub async fn load<P: AsRef<Path>>(
+        &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
         path: P,
-    ) -> Result<Self> {
+    ) -> Result<Model> {
         let resource_base = "resources/cube/";
         let obj_data = FileReader::read_file(&(resource_base.to_owned() + "cube.obj")).await;
         let (obj_models, obj_materials) = tobj::load_obj_buf_async(
@@ -194,59 +294,72 @@ impl Model {
 
             let indices = &model.mesh.indices;
 
-            for chunk in indices.chunks(3) {
-                let v0 = vertices[chunk[0] as usize];
-                let v1 = vertices[chunk[1] as usize];
-                let v2 = vertices[chunk[2] as usize];
-
-                let pos0: Vector3<f32> = v0.position.into();
-                let pos1: Vector3<f32> = v1.position.into();
-                let pos2: Vector3<f32> = v2.position.into();
-
-                let uv0: Vector2<f32> = v0.tex_coords.into();
-                let uv1: Vector2<f32> = v1.tex_coords.into();
-                let uv2: Vector2<f32> = v2.tex_coords.into();
-
-                let delta_pos1 = pos1 - pos0;
-                let delta_pos2 = pos2 - pos0;
-
-                let delta_uv1 = uv1 - uv0;
-                let delta_uv2 = uv2 - uv0;
-                let r = 1.0 / (delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x);
-                let tangent = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
-                let bitangent = (delta_pos2 * delta_uv1.x - delta_pos1 * delta_uv2.x) * r;
-
-                vertices[chunk[0] as usize].tangent = tangent.into();
-                vertices[chunk[1] as usize].tangent = tangent.into();
-                vertices[chunk[2] as usize].tangent = tangent.into();
-
-                vertices[chunk[0] as usize].bitangent = bitangent.into();
-                vertices[chunk[1] as usize].bitangent = bitangent.into();
-                vertices[chunk[2] as usize].bitangent = bitangent.into();
-            }
-
-            let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} Vertex Buffer", path.as_ref())),
+            let src_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("{:?} Compute Src Vertex Buffer", path.as_ref())),
                 contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX,
+                usage: wgpu::BufferUsages::STORAGE,
+            });
+
+            let dst_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("{:?} Compute Dst Vertex Buffer", path.as_ref())),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::STORAGE,
             });
 
             let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("{:?} Index Buffer", path.as_ref())),
                 contents: bytemuck::cast_slice(&model.mesh.indices),
-                usage: wgpu::BufferUsages::INDEX,
+                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::STORAGE,
             });
+
+            let compute_info = ComputeInfo {
+                num_vertices: vertices.len() as _,
+                num_indices: indices.len() as _,
+            };
+
+            let info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("{:?} Compute Info Buffer", path.as_ref())),
+                contents: bytemuck::cast_slice(&[compute_info]),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+
+            let binding = BitangentComputeBinding {
+                src_vertex_buffer,
+                dst_vertex_buffer,
+                index_buffer,
+                info_buffer,
+                compute_info,
+            };
+
+            let calc_bind_group = self.binder.create_bind_group(
+                &binding,
+                device,
+                Some("Bitangent Compute Binding Group"),
+            );
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Tangent and Bitangent compute encoder"),
+            });
+            {
+                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some("Compute Pass"),
+                });
+                pass.set_pipeline(&self.pipeline);
+                pass.set_bind_group(0, &calc_bind_group, &[0]);
+                pass.dispatch(binding.compute_info.num_vertices, 0, 0);
+            }
+            queue.submit(std::iter::once(encoder.finish()));
+            device.poll(wgpu::Maintain::Wait);
 
             meshes.push(Mesh {
                 name: model.name,
-                vertex_buffer,
-                index_buffer,
-                num_elements: model.mesh.indices.len() as u32,
+                vertex_buffer: binding.dst_vertex_buffer,
+                index_buffer: binding.index_buffer,
+                num_elements: binding.compute_info.num_indices,
                 material: model.mesh.material_id.unwrap_or(0),
             });
         }
 
-        Ok(Self { meshes, materials })
+        Ok(Model { meshes, materials })
     }
 }
 
