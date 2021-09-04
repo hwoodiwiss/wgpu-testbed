@@ -344,7 +344,7 @@ impl ModelLoader {
                     label: Some("Compute Pass"),
                 });
                 pass.set_pipeline(&self.pipeline);
-                pass.set_bind_group(0, &calc_bind_group, &[0]);
+                pass.set_bind_group(0, &calc_bind_group, &[]);
                 pass.dispatch(binding.compute_info.num_vertices, 0, 0);
             }
             queue.submit(std::iter::once(encoder.finish()));
