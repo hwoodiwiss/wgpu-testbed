@@ -17,6 +17,7 @@ pub struct ModelVertex {
     normal: [f32; 3],
     tangent: [f32; 3],
     bitangent: [f32; 3],
+    padding: [u32; 2],
 }
 
 impl Vertex for ModelVertex {
@@ -289,6 +290,7 @@ impl ModelLoader {
                     ],
                     tangent: [0.0; 3],
                     bitangent: [0.0; 3],
+                    padding: [0u32; 2],
                 });
             }
 
@@ -345,10 +347,12 @@ impl ModelLoader {
                 });
                 pass.set_pipeline(&self.pipeline);
                 pass.set_bind_group(0, &calc_bind_group, &[]);
-                pass.dispatch(binding.compute_info.num_vertices, 0, 0);
+                pass.dispatch(binding.compute_info.num_vertices, 1, 1);
             }
             queue.submit(std::iter::once(encoder.finish()));
             device.poll(wgpu::Maintain::Wait);
+
+            println!("{:?}", binding.dst_vertex_buffer.as_entire_binding());
 
             meshes.push(Mesh {
                 name: model.name,

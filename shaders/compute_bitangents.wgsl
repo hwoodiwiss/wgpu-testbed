@@ -5,6 +5,7 @@ struct ModelVertex {
 	nx: f32; ny: f32; nz: f32;
 	tx: f32; ty: f32; tz: f32;
 	bx: f32; by: f32; bz: f32;
+	pad0_: u32; pad1_: u32;
 };
 
 [[block]] struct ComputeInfo {
@@ -13,11 +14,11 @@ struct ModelVertex {
 };
 
 [[block]] struct ModelVetexBuffer {
-	verts: array<ModelVertex>;
+	verts: [[stride(64)]] array<ModelVertex>;
 };
 
 [[block]] struct IndexBuffer {
-	indicies: array<u32>;
+	indicies: [[stride(4)]] array<u32>;
 };
 
 [[group(0), binding(0)]]
@@ -52,12 +53,12 @@ fn calcTangentBitangent(vert_idx: u32) -> ModelVertex {
 
 	var tangent: vec3<f32>;
 	var bitangent: vec3<f32>;
-	var tris_included: i32;
+	var tris_included: f32;
 
-	for(var i: i32 = 0; i < i32(info.num_indicies); i = i + 3) {
+	for(var i: u32 = 0u; i < info.num_indicies; i = i + 3u) {
 		let idx0 = idx_buffer.indicies[i];
-		let idx1 = idx_buffer.indicies[i + 1];
-		let idx2 = idx_buffer.indicies[i + 2];
+		let idx1 = idx_buffer.indicies[i + 1u];
+		let idx2 = idx_buffer.indicies[i + 2u];
 
 		if(idx0 == vert_idx || idx1 == vert_idx || idx2 == vert_idx) {
 			let vert0 = src_verts.verts[idx0];
@@ -81,13 +82,13 @@ fn calcTangentBitangent(vert_idx: u32) -> ModelVertex {
 			let r: f32 = 1.0 / (delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x);
 			tangent = tangent + (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
             bitangent = bitangent + (delta_pos2 * delta_uv1.x - delta_pos1 * delta_uv2.x) * r; 
-            tris_included = tris_included + 1;
+            tris_included = tris_included + 1.0;
 		}
 	}
 
-	if(tris_included > 0) {
-		//tangent = tangent / tris_included;
-        //bitangent = bitangent / tris_included;
+	if(tris_included > 0.0) {
+		tangent = tangent / tris_included;
+        bitangent = bitangent / tris_included;
         tangent = normalize(tangent);
         bitangent = normalize(bitangent);
 	}
@@ -103,7 +104,7 @@ fn calcTangentBitangent(vert_idx: u32) -> ModelVertex {
 	return curr_vert;
 }
 
-[[stage(compute), workgroup_size(8u)]]
+[[stage(compute), workgroup_size(64, 1, 1)]]
 fn main([[builtin(global_invocation_id)]] global_ix: vec3<u32>) {
 	let vert_idx = global_ix.x;
 	let result = calcTangentBitangent(vert_idx);
