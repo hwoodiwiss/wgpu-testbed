@@ -1,11 +1,11 @@
 #[cfg(target_arch = "wasm32")]
-use js_sys::{Array, ArrayBuffer};
+use js_sys::ArrayBuffer;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::JsFuture;
 #[cfg(target_arch = "wasm32")]
-use web_sys::{Document, Response, Window};
+use web_sys::Response;
 
 pub struct FileReader {}
 

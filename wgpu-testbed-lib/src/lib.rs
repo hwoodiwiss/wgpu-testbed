@@ -8,9 +8,6 @@ use winit::{
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-#[cfg(target_arch = "wasm32")]
-use web_sys::HtmlCanvasElement;
-
 use crate::state::State;
 
 mod camera;
