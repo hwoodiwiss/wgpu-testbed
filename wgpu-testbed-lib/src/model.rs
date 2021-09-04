@@ -1,5 +1,4 @@
 use anyhow::*;
-use cgmath::{Vector2, Vector3};
 use std::{ops::Range, path::Path};
 
 use crate::file_reader::FileReader;
@@ -351,8 +350,6 @@ impl ModelLoader {
             }
             queue.submit(std::iter::once(encoder.finish()));
             device.poll(wgpu::Maintain::Wait);
-
-            println!("{:?}", binding.dst_vertex_buffer.as_entire_binding());
 
             meshes.push(Mesh {
                 name: model.name,
