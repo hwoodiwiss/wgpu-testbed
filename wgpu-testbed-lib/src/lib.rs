@@ -18,6 +18,7 @@ mod file_reader;
 mod instance;
 mod light;
 mod model;
+mod pipeline;
 mod state;
 mod texture;
 mod uniform;
