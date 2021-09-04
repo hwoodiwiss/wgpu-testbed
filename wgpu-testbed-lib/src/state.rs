@@ -1,6 +1,7 @@
 use crate::camera::CameraController;
 use crate::file_reader::FileReader;
 use crate::instance::InstanceRaw;
+use crate::pipeline;
 use crate::uniform::Uniforms;
 use crate::{instance::Instance, light::Light};
 use cgmath::*;
@@ -295,13 +296,14 @@ impl State {
                 source: wgpu::ShaderSource::Wgsl(shader_str.into()),
             };
 
-            State::create_render_pipeline(
+            pipeline::create_render_pipeline(
                 &device,
                 &render_pipeline_layout,
                 surface_config.format,
                 Some(texture::Texture::DEPTH_FORMAT),
                 &[model::ModelVertex::desc(), InstanceRaw::desc()],
                 shader,
+                Some("Render Pipeline"),
             )
         };
 
@@ -320,13 +322,14 @@ impl State {
                 source: wgpu::ShaderSource::Wgsl(shader_str.into()),
             };
 
-            Self::create_render_pipeline(
+            pipeline::create_render_pipeline(
                 &device,
                 &layout,
                 surface_config.format,
                 Some(texture::Texture::DEPTH_FORMAT),
                 &[model::ModelVertex::desc()],
                 shader,
+                Some("Light render pipeline"),
             )
         };
 
@@ -352,60 +355,6 @@ impl State {
             light_bind_group,
             light_render_pipeline,
         }
-    }
-
-    fn create_render_pipeline(
-        device: &wgpu::Device,
-        layout: &wgpu::PipelineLayout,
-        colour_format: wgpu::TextureFormat,
-        depth_format: Option<wgpu::TextureFormat>,
-        vertex_layouts: &[wgpu::VertexBufferLayout],
-        shader: wgpu::ShaderModuleDescriptor,
-    ) -> wgpu::RenderPipeline {
-        let shader = device.create_shader_module(&shader);
-
-        return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "main",
-                buffers: vertex_layouts,
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "main",
-                targets: &[wgpu::ColorTargetState {
-                    format: colour_format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent::REPLACE,
-                        alpha: wgpu::BlendComponent::REPLACE,
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                }],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                clamp_depth: false,
-                conservative: false,
-            },
-            depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
-                format,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::LessEqual,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-        });
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
