@@ -24,7 +24,7 @@ struct VertexOutput {
 };
 
 [[stage(vertex)]]
-fn main(
+fn vertex_main(
     model: VertexInput,
 ) -> VertexOutput {
     let scale = 0.25;
@@ -35,6 +35,6 @@ fn main(
 }
 
 [[stage(fragment)]]
-fn main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+fn fragment_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     return vec4<f32>(in.colour, 1.0);
 }
