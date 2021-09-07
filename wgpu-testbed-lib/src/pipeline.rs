@@ -50,12 +50,12 @@ pub fn create_render_pipeline(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: "main",
+            entry_point: "vertex_main",
             buffers: vertex_layouts,
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: "main",
+            entry_point: "fragment_main",
             targets: &[wgpu::ColorTargetState {
                 format: colour_format,
                 blend: Some(wgpu::BlendState {

@@ -43,7 +43,7 @@ struct VertexOutput {
 };
 
 [[stage(vertex)]]
-fn main(model: VertexInput, instance: InstanceInput) -> VertexOutput {
+fn vertex_main(model: VertexInput, instance: InstanceInput) -> VertexOutput {
     let model_matrix = mat4x4<f32>(
         instance.model_matrix_0,
         instance.model_matrix_1,
@@ -91,7 +91,7 @@ var t_normal: texture_2d<f32>;
 var s_normal: sampler;
 
 [[stage(fragment)]]
-fn main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+fn fragment_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     let object_colour: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
     let object_normal: vec4<f32> = textureSample(t_normal, s_normal, in.tex_coords);
 
