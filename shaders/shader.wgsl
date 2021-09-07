@@ -95,7 +95,7 @@ fn fragment_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     let object_colour: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
     let object_normal: vec4<f32> = textureSample(t_normal, s_normal, in.tex_coords);
 
-    let ambient_magnitude = 0.1f;
+    let ambient_magnitude = 0.1;
     let ambient_colour = light.colour * ambient_magnitude;
 
     let tangent_normal = object_normal.xyz * 2.0 - 1.0;
