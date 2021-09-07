@@ -13,7 +13,7 @@ cgmath = "0.18"
 env_logger = "0.9.0"
 log = "0.4"
 futures = "0.3"
-wgpu = { git = "https://github.com/hwoodiwiss/wgpu", branch = "update-web-sys-0.3.53" }
+wgpu = { git = "https://github.com/hwoodiwiss/wgpu", branch = "fix-deprecated-canvas-context" }
 bytemuck = { version = "1.5.1", features = [ "derive" ] }
 anyhow = "1.0" 
 tobj = { git = "https://github.com/hwoodiwiss/tobj", branch = "add-async-obj-load-buf", features = ["async"]}
