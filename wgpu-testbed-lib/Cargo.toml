@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-image = { version = "0.23", default-features = false, features = ["jpeg", "png"] }
+image = { version = "0.23", default-features = false, features = ["jpeg", "png", "tga"] }
 winit = { version = "0.25.0", features = [ "web-sys" ] }
 cgmath = "0.18"
 env_logger = "0.9.0"

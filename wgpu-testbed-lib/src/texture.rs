@@ -73,13 +73,17 @@ impl Texture {
     pub async fn load(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        path: String,
+        path: &str,
         is_normal_map: bool,
     ) -> Result<Self> {
-        let label = Some(path.as_str());
+        let label = Some(path);
 
-        let img_buffer = FileReader::read_file(path.as_str()).await;
-        let img = image::load_from_memory(&img_buffer)?;
+        let img_buffer = FileReader::read_file(path).await;
+        let img = if path.contains(".tga") {
+            image::load_from_memory_with_format(&img_buffer, image::ImageFormat::Tga)?
+        } else {
+            image::load_from_memory(&img_buffer)?
+        };
         Self::from_image(device, queue, &img, label, is_normal_map)
     }
 

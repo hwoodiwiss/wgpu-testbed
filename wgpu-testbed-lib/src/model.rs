@@ -197,8 +197,11 @@ impl ModelLoader {
         layout: &wgpu::BindGroupLayout,
         path: P,
     ) -> Result<Model> {
-        let resource_base = "resources/cube/";
-        let obj_data = FileReader::read_file(&(resource_base.to_owned() + "cube.obj")).await;
+        let path = path.as_ref();
+        let resource_base = path.parent().expect("Could not determine model base path");
+        let obj_data =
+            FileReader::read_file(path.to_str().expect("Could not convert model path to &str"))
+                .await;
         let (obj_models, obj_materials) = tobj::load_obj_buf_async(
             &mut obj_data.as_slice(),
             &tobj::LoadOptions {
@@ -208,8 +211,13 @@ impl ModelLoader {
             },
             |path| {
                 Box::pin(async move {
-                    let mtl_data =
-                        FileReader::read_file(&(resource_base.to_owned() + path.as_str())).await;
+                    let mtl_data = FileReader::read_file(
+                        resource_base
+                            .join(path)
+                            .to_str()
+                            .expect("Could not convert material path to &str"),
+                    )
+                    .await;
                     tobj::load_mtl_buf(&mut mtl_data.as_slice())
                 })
             },
@@ -221,20 +229,24 @@ impl ModelLoader {
         let mut materials = Vec::new();
 
         for mat in obj_materials {
-            let diffuse_path = mat.diffuse_texture;
+            let diffuse_path = &mat.diffuse_texture;
             let diffuse_texture = Texture::load(
                 device,
                 queue,
-                resource_base.to_owned() + diffuse_path.as_str(),
+                resource_base.join(diffuse_path).to_str().expect(
+                    ("Could not convert diffuse path to &str: ".to_owned() + diffuse_path).as_str(),
+                ),
                 false,
             )
             .await?;
 
-            let normal_path = mat.normal_texture;
+            let normal_path = &mat.normal_texture;
             let normal_texture = Texture::load(
                 device,
                 queue,
-                resource_base.to_owned() + normal_path.as_str(),
+                resource_base.join(normal_path).to_str().expect(
+                    ("Could not convert normal path to &str: ".to_owned() + normal_path).as_str(),
+                ),
                 true,
             )
             .await?;
@@ -296,19 +308,19 @@ impl ModelLoader {
             let indices = &model.mesh.indices;
 
             let src_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} Compute Src Vertex Buffer", path.as_ref())),
+                label: Some(&format!("{:?} Compute Src Vertex Buffer", path)),
                 contents: bytemuck::cast_slice(&vertices),
                 usage: wgpu::BufferUsages::STORAGE,
             });
 
             let dst_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} Compute Dst Vertex Buffer", path.as_ref())),
+                label: Some(&format!("{:?} Compute Dst Vertex Buffer", path)),
                 contents: bytemuck::cast_slice(&vertices),
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::STORAGE,
             });
 
             let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} Index Buffer", path.as_ref())),
+                label: Some(&format!("{:?} Index Buffer", path)),
                 contents: bytemuck::cast_slice(&model.mesh.indices),
                 usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::STORAGE,
             });
@@ -319,7 +331,7 @@ impl ModelLoader {
             };
 
             let info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} Compute Info Buffer", path.as_ref())),
+                label: Some(&format!("{:?} Compute Info Buffer", path)),
                 contents: bytemuck::cast_slice(&[compute_info]),
                 usage: wgpu::BufferUsages::UNIFORM,
             });
