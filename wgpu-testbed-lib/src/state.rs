@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::camera::CameraController;
 use crate::file_reader::FileReader;
 use crate::instance::InstanceRaw;
@@ -285,7 +287,7 @@ impl State {
         });
 
         let depth_texture =
-            Texture::create_depth_texture(&device, &surface_config, 1.0, "Depth Texture");
+            Texture::create_depth_texture(&device, &surface_config, 2.0, "Depth Texture");
         let shader_buffer = FileReader::read_file("shaders/shader.wgsl").await;
         let shader_str =
             std::str::from_utf8(shader_buffer.as_slice()).expect("Failed to load shader");
@@ -418,11 +420,18 @@ impl State {
             ..Default::default()
         });
 
+        let diffuse_texture = Texture::create_render_texture(
+            &self.device,
+            &self.surface_config,
+            2.0,
+            "Deferred Surface",
+        );
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Frame render pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &frame_view,
+                    view: &diffuse_texture.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(self.bg_color),
@@ -455,6 +464,21 @@ impl State {
                 &self.uniform_bind_group,
                 &self.light_bind_group,
             );
+        }
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Frame render pass"),
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &frame_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(self.bg_color),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));

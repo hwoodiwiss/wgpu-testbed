@@ -10,6 +10,35 @@ use wgpu::util::DeviceExt;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct QuadVertex {
+    position: [f32; 3],
+    tex_coords: [f32; 2],
+    padding: [f32; 3],
+}
+
+impl Vertex for QuadVertex {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<ModelVertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: 0,
+                    shader_location: 0,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x2,
+                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                },
+            ],
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ModelVertex {
     position: [f32; 3],
     tex_coords: [f32; 2],
@@ -422,6 +451,11 @@ where
         uniforms: &'b wgpu::BindGroup,
         light: &'b wgpu::BindGroup,
     ) {
+        self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+        self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        self.set_bind_group(0, &material.bind_group, &[]);
+        self.set_bind_group(1, &uniforms, &[]);
+        self.set_bind_group(2, &light, &[]);
         self.draw_mesh_instanced(mesh, material, 0..1, uniforms, light);
     }
 
