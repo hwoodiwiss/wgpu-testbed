@@ -2,7 +2,6 @@ use crate::camera::CameraController;
 use crate::file_reader::FileReader;
 use crate::instance::InstanceRaw;
 use crate::pipeline;
-use crate::render_pass::{DeferredRenderPass, RenderPass};
 use crate::uniform::Uniforms;
 use crate::{instance::Instance, light::Light};
 use cgmath::*;
@@ -55,7 +54,6 @@ pub struct State {
     light_buffer: wgpu::Buffer,
     light_bind_group: wgpu::BindGroup,
     light_render_pipeline: wgpu::RenderPipeline,
-    deferred_pass: dyn RenderPass,
 }
 
 impl State {
@@ -287,20 +285,10 @@ impl State {
         });
 
         let depth_texture =
-            Texture::create_depth_texture(&device, &surface_config, "Depth Texture");
+            Texture::create_depth_texture(&device, &surface_config, 1.0, "Depth Texture");
         let shader_buffer = FileReader::read_file("shaders/shader.wgsl").await;
         let shader_str =
             std::str::from_utf8(shader_buffer.as_slice()).expect("Failed to load shader");
-
-        let diffuse_texture =
-            Texture::create_render_texture(&device, &surface_config, "Diffuse Surface");
-        let normal_texture =
-            Texture::create_render_texture(&device, &surface_config, "Normal Surface");
-        let specular_texture =
-            Texture::create_render_texture(&device, &surface_config, "Specular Surface");
-
-        let deferred_pass =
-            DeferredRenderPass::new(diffuse_texture, normal_texture, specular_texture);
 
         let render_pipeline = {
             let shader = wgpu::ShaderModuleDescriptor {
@@ -311,7 +299,6 @@ impl State {
             pipeline::create_render_pipeline(
                 &device,
                 &render_pipeline_layout,
-                surface_config.format,
                 Some(texture::Texture::DEPTH_FORMAT),
                 &[model::ModelVertex::desc(), InstanceRaw::desc()],
                 shader,
@@ -345,36 +332,17 @@ impl State {
             pipeline::create_render_pipeline(
                 &device,
                 &layout,
-                surface_config.format,
                 Some(texture::Texture::DEPTH_FORMAT),
                 &[model::ModelVertex::desc()],
                 shader,
-                &[
-                    wgpu::ColorTargetState {
-                        format: surface_config.format,
-                        blend: Some(wgpu::BlendState {
-                            color: wgpu::BlendComponent::REPLACE,
-                            alpha: wgpu::BlendComponent::REPLACE,
-                        }),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    },
-                    wgpu::ColorTargetState {
-                        format: surface_config.format,
-                        blend: Some(wgpu::BlendState {
-                            color: wgpu::BlendComponent::REPLACE,
-                            alpha: wgpu::BlendComponent::REPLACE,
-                        }),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    },
-                    wgpu::ColorTargetState {
-                        format: surface_config.format,
-                        blend: Some(wgpu::BlendState {
-                            color: wgpu::BlendComponent::REPLACE,
-                            alpha: wgpu::BlendComponent::REPLACE,
-                        }),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    },
-                ],
+                &[wgpu::ColorTargetState {
+                    format: surface_config.format,
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent::REPLACE,
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }],
                 Some("Light render pipeline"),
             )
         };
@@ -400,7 +368,6 @@ impl State {
             light_buffer,
             light_bind_group,
             light_render_pipeline,
-            deferred_pass,
         }
     }
 
@@ -410,7 +377,7 @@ impl State {
         self.surface_config.height = self.size.height;
         self.surface.configure(&self.device, &self.surface_config);
         self.depth_texture =
-            Texture::create_depth_texture(&self.device, &self.surface_config, "Depth Texture");
+            Texture::create_depth_texture(&self.device, &self.surface_config, 1.0, "Depth Texture");
         self.camera.aspect = self.surface_config.width as f32 / self.surface_config.height as f32
     }
 
@@ -439,24 +406,11 @@ impl State {
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let frame = self.surface.get_current_frame()?.output;
 
-        let mut command_buffers = Vec::<wgpu::CommandBuffer>::new();
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
-
-        let mut render_pass = encoder.begin_render_pass(self.deferred_pass.get_desc());
-
-        render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-
-        render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.draw_model_instanced(
-            &self.obj_model,
-            0..self.instances.len() as u32,
-            &self.uniform_bind_group,
-            &self.light_bind_group,
-        );
 
         let frame_view = frame.texture.create_view(&wgpu::TextureViewDescriptor {
             label: Some("Render Texture View"),
@@ -464,34 +418,46 @@ impl State {
             ..Default::default()
         });
 
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Frame render pass"),
-            color_attachments: &[wgpu::RenderPassColorAttachment {
-                view: &frame_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(self.bg_color),
-                    store: true,
-                },
-            }],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &self.depth_texture.view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: true,
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Frame render pass"),
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &frame_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(self.bg_color),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
                 }),
-                stencil_ops: None,
-            }),
-        });
+            });
 
-        render_pass.set_pipeline(&self.light_render_pipeline);
-        render_pass.draw_light_model(
-            &self.obj_model,
-            &self.uniform_bind_group,
-            &self.light_bind_group,
-        );
+            render_pass.set_pipeline(&self.light_render_pipeline);
+            render_pass.draw_light_model(
+                &self.obj_model,
+                &self.uniform_bind_group,
+                &self.light_bind_group,
+            );
 
-        self.queue.submit(command_buffers);
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.draw_model_instanced(
+                &self.obj_model,
+                0..self.instances.len() as u32,
+                &self.uniform_bind_group,
+                &self.light_bind_group,
+            );
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
         Ok(())
     }
 }

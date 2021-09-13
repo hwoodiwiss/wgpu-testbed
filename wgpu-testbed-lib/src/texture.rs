@@ -15,11 +15,12 @@ impl Texture {
     pub fn create_depth_texture(
         device: &wgpu::Device,
         surface_config: &wgpu::SurfaceConfiguration,
+        render_scale: f32,
         label: &str,
     ) -> Self {
         let size = wgpu::Extent3d {
-            width: surface_config.width,
-            height: surface_config.height,
+            width: (surface_config.width as f32 * render_scale) as u32,
+            height: (surface_config.height as f32 * render_scale) as u32,
             depth_or_array_layers: 1,
         };
 
@@ -61,11 +62,12 @@ impl Texture {
     pub fn create_render_texture(
         device: &wgpu::Device,
         surface_config: &wgpu::SurfaceConfiguration,
+        render_scale: f32,
         label: &str,
     ) -> Self {
         let size = wgpu::Extent3d {
-            width: surface_config.width,
-            height: surface_config.height,
+            width: (surface_config.width as f32 * render_scale) as u32,
+            height: (surface_config.height as f32 * render_scale) as u32,
             depth_or_array_layers: 1,
         };
 
