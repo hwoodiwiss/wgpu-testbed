@@ -16,6 +16,7 @@ mod instance;
 mod light;
 mod model;
 mod pipeline;
+mod render_pass;
 mod state;
 mod texture;
 mod uniform;
