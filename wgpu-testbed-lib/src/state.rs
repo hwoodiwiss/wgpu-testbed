@@ -1,9 +1,7 @@
-use std::ops::Deref;
-
 use crate::camera::CameraController;
 use crate::file_reader::FileReader;
 use crate::instance::InstanceRaw;
-use crate::pipeline;
+use crate::pipeline::{self, create_render_pipeline};
 use crate::uniform::Uniforms;
 use crate::{instance::Instance, light::Light};
 use cgmath::*;
@@ -13,7 +11,7 @@ use wgpu::PowerPreference;
 use winit::{event::WindowEvent, window::Window};
 
 use crate::camera::Camera;
-use crate::model::{self, DrawLight, ModelLoader};
+use crate::model::{self, DrawLight, Material, Mesh, ModelLoader, QuadVertex};
 use crate::model::{DrawModel, Model};
 use crate::texture::{self, Texture};
 use crate::vertex::Vertex;
@@ -35,6 +33,7 @@ const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
     INSTANCES_PER_ROW as f32 * 0.5,
 );
 
+const RENDER_SCALE: f32 = 2.0;
 pub struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -42,7 +41,7 @@ pub struct State {
     surface_config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
     bg_color: wgpu::Color,
-    render_pipeline: wgpu::RenderPipeline,
+    deferred_render_pipeline: wgpu::RenderPipeline,
     camera: Camera,
     uniforms: Uniforms,
     uniform_buffer: wgpu::Buffer,
@@ -52,10 +51,13 @@ pub struct State {
     instance_buffer: wgpu::Buffer,
     depth_texture: Texture,
     obj_model: Model,
+    screen_quad: Mesh,
+    render_material: Material,
     light: Light,
     light_buffer: wgpu::Buffer,
     light_bind_group: wgpu::BindGroup,
     light_render_pipeline: wgpu::RenderPipeline,
+    output_render_pipeline: wgpu::RenderPipeline,
 }
 
 impl State {
@@ -287,12 +289,12 @@ impl State {
         });
 
         let depth_texture =
-            Texture::create_depth_texture(&device, &surface_config, 2.0, "Depth Texture");
+            Texture::create_depth_texture(&device, &surface_config, RENDER_SCALE, "Depth Texture");
         let shader_buffer = FileReader::read_file("shaders/shader.wgsl").await;
         let shader_str =
             std::str::from_utf8(shader_buffer.as_slice()).expect("Failed to load shader");
 
-        let render_pipeline = {
+        let deferred_render_pipeline = {
             let shader = wgpu::ShaderModuleDescriptor {
                 label: Some("Normal Shader"),
                 source: wgpu::ShaderSource::Wgsl(shader_str.into()),
@@ -349,6 +351,125 @@ impl State {
             )
         };
 
+        let output_bindgroup_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler {
+                            filtering: true,
+                            comparison: false,
+                        },
+                        count: None,
+                    },
+                ],
+                label: None,
+            });
+
+        let shader_buffer = FileReader::read_file("shaders/draw_deferred.wgsl").await;
+        let shader_str =
+            std::str::from_utf8(shader_buffer.as_slice()).expect("Failed to load shader");
+
+        let output_render_pipeline = {
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Light pipeline layout desc"),
+                bind_group_layouts: &[&output_bindgroup_layout],
+                push_constant_ranges: &[],
+            });
+
+            let shader = wgpu::ShaderModuleDescriptor {
+                label: Some("Output Shader"),
+                source: wgpu::ShaderSource::Wgsl(shader_str.into()),
+            };
+
+            create_render_pipeline(
+                &device,
+                &layout,
+                None,
+                &[QuadVertex::desc()],
+                shader,
+                &[wgpu::ColorTargetState {
+                    format: surface_config.format,
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent::REPLACE,
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }],
+                Some("Output Pipeline"),
+            )
+        };
+
+        let diffuse_texture = Texture::create_render_texture(
+            &device,
+            &surface_config,
+            RENDER_SCALE,
+            "Deferred Surface",
+        );
+
+        let quad_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("BG"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler {
+                            filtering: true,
+                            comparison: false,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        let screen_quad = ModelLoader::create_screen_quad_mesh(&device);
+
+        let render_material = {
+            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &quad_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+                    },
+                ],
+            });
+
+            Material {
+                name: String::from("Output Quad Textures"),
+                diffuse_texture,
+                normal_texture: None,
+                bind_group,
+            }
+        };
+
         Self {
             surface,
             device,
@@ -356,7 +477,7 @@ impl State {
             surface_config,
             size,
             bg_color,
-            render_pipeline,
+            deferred_render_pipeline,
             camera,
             uniforms,
             uniform_buffer,
@@ -370,6 +491,9 @@ impl State {
             light_buffer,
             light_bind_group,
             light_render_pipeline,
+            output_render_pipeline,
+            screen_quad,
+            render_material,
         }
     }
 
@@ -378,9 +502,71 @@ impl State {
         self.surface_config.width = self.size.width;
         self.surface_config.height = self.size.height;
         self.surface.configure(&self.device, &self.surface_config);
-        self.depth_texture =
-            Texture::create_depth_texture(&self.device, &self.surface_config, 1.0, "Depth Texture");
-        self.camera.aspect = self.surface_config.width as f32 / self.surface_config.height as f32
+        self.depth_texture = Texture::create_depth_texture(
+            &self.device,
+            &self.surface_config,
+            RENDER_SCALE,
+            "Depth Texture",
+        );
+        self.camera.aspect = self.surface_config.width as f32 / self.surface_config.height as f32;
+
+        let diffuse_texture = Texture::create_render_texture(
+            &self.device,
+            &self.surface_config,
+            RENDER_SCALE,
+            "Deferred Surface",
+        );
+
+        let quad_bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("BG"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler {
+                                filtering: true,
+                                comparison: false,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        self.render_material = {
+            let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &quad_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+                    },
+                ],
+            });
+
+            Material {
+                name: String::from("Output Quad Textures"),
+                diffuse_texture,
+                normal_texture: None,
+                bind_group,
+            }
+        };
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
@@ -420,18 +606,11 @@ impl State {
             ..Default::default()
         });
 
-        let diffuse_texture = Texture::create_render_texture(
-            &self.device,
-            &self.surface_config,
-            2.0,
-            "Deferred Surface",
-        );
-
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Frame render pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &diffuse_texture.view,
+                    view: &self.render_material.diffuse_texture.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(self.bg_color),
@@ -457,7 +636,7 @@ impl State {
 
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
 
-            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_pipeline(&self.deferred_render_pipeline);
             render_pass.draw_model_instanced(
                 &self.obj_model,
                 0..self.instances.len() as u32,
@@ -479,6 +658,16 @@ impl State {
                 }],
                 depth_stencil_attachment: None,
             });
+
+            render_pass.set_pipeline(&self.output_render_pipeline);
+
+            render_pass.set_vertex_buffer(0, self.screen_quad.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(
+                self.screen_quad.index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
+            render_pass.set_bind_group(0, &self.render_material.bind_group, &[]);
+            render_pass.draw_indexed(0..self.screen_quad.num_elements, 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
