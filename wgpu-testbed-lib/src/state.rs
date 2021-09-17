@@ -150,7 +150,7 @@ impl State {
             aspect: surface_config.width as f32 / surface_config.height as f32,
             fovy: 45.0,
             znear: 0.1,
-            zfar: 100.0,
+            zfar: 1000.0,
         };
 
         let camera_controller = CameraController::new(0.2);
