@@ -1,4 +1,6 @@
 use anyhow::*;
+use std::collections::HashMap;
+use std::iter::FromIterator;
 use std::{ops::Range, path::Path};
 
 use crate::file_reader::FileReader;
@@ -85,8 +87,7 @@ impl Vertex for ModelVertex {
 
 pub struct Material {
     pub name: String,
-    pub diffuse_texture: Texture,
-    pub normal_texture: Option<Texture>,
+    pub textures: HashMap<String, Texture>,
     pub bind_group: wgpu::BindGroup,
 }
 
@@ -304,8 +305,10 @@ impl ModelLoader {
 
             materials.push(Material {
                 name: mat.name,
-                diffuse_texture,
-                normal_texture: Some(normal_texture),
+                textures: HashMap::from_iter([
+                    ("diffuse".to_owned(), diffuse_texture),
+                    ("normal".to_owned(), normal_texture),
+                ]),
                 bind_group,
             })
         }

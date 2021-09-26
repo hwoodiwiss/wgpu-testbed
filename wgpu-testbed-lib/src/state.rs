@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::iter::FromIterator;
+
 use crate::camera::CameraController;
 use crate::file_reader::FileReader;
 use crate::instance::InstanceRaw;
@@ -464,8 +467,7 @@ impl State {
 
             Material {
                 name: String::from("Output Quad Textures"),
-                diffuse_texture,
-                normal_texture: None,
+                textures: HashMap::from_iter([("ss_diffuse".to_owned(), diffuse_texture)]),
                 bind_group,
             }
         };
@@ -562,8 +564,7 @@ impl State {
 
             Material {
                 name: String::from("Output Quad Textures"),
-                diffuse_texture,
-                normal_texture: None,
+                textures: HashMap::from_iter([("ss_diffuse".to_owned(), diffuse_texture)]),
                 bind_group,
             }
         };
@@ -610,7 +611,7 @@ impl State {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Frame render pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &self.render_material.diffuse_texture.view,
+                    view: &self.render_material.textures["ss_diffuse"].view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(self.bg_color),
