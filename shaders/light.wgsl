@@ -34,7 +34,14 @@ fn vertex_main(
     return out;
 }
 
+struct FragmentOutput {
+    [[location(0)]] diffuse: vec4<f32>;
+    [[location(1)]] normal: vec4<f32>;
+};
+
 [[stage(fragment)]]
-fn fragment_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    return vec4<f32>(in.colour, 1.0);
+fn fragment_main(in: VertexOutput) -> FragmentOutput {
+    var out: FragmentOutput;
+    out.diffuse = vec4<f32>(in.colour, 1.0);
+    return out;
 }

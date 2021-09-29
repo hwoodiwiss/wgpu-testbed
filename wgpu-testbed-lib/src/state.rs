@@ -309,14 +309,24 @@ impl State {
                 Some(texture::Texture::DEPTH_FORMAT),
                 &[model::ModelVertex::desc(), InstanceRaw::desc()],
                 shader,
-                &[wgpu::ColorTargetState {
-                    format: surface_config.format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent::REPLACE,
-                        alpha: wgpu::BlendComponent::REPLACE,
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                }],
+                &[
+                    wgpu::ColorTargetState {
+                        format: surface_config.format,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent::REPLACE,
+                            alpha: wgpu::BlendComponent::REPLACE,
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    },
+                    wgpu::ColorTargetState {
+                        format: surface_config.format,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent::REPLACE,
+                            alpha: wgpu::BlendComponent::REPLACE,
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    },
+                ],
                 Some("Render Pipeline"),
             )
         };
@@ -342,14 +352,24 @@ impl State {
                 Some(texture::Texture::DEPTH_FORMAT),
                 &[model::ModelVertex::desc()],
                 shader,
-                &[wgpu::ColorTargetState {
-                    format: surface_config.format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent::REPLACE,
-                        alpha: wgpu::BlendComponent::REPLACE,
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                }],
+                &[
+                    wgpu::ColorTargetState {
+                        format: surface_config.format,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent::REPLACE,
+                            alpha: wgpu::BlendComponent::REPLACE,
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    },
+                    wgpu::ColorTargetState {
+                        format: surface_config.format,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent::REPLACE,
+                            alpha: wgpu::BlendComponent::REPLACE,
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    },
+                ],
                 Some("Light render pipeline"),
             )
         };
@@ -376,6 +396,25 @@ impl State {
                         },
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler {
+                            filtering: true,
+                            comparison: false,
+                        },
+                        count: None,
+                    },
                 ],
                 label: None,
             });
@@ -386,7 +425,7 @@ impl State {
 
         let output_render_pipeline = {
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Light pipeline layout desc"),
+                label: Some("Deferred pipeline layout desc"),
                 bind_group_layouts: &[&output_bindgroup_layout],
                 push_constant_ranges: &[],
             });
@@ -418,12 +457,19 @@ impl State {
             &device,
             &surface_config,
             RENDER_SCALE,
-            "Deferred Surface",
+            "Deferred Diffuse Surface",
+        );
+
+        let specular_texture = Texture::create_render_texture(
+            &device,
+            &surface_config,
+            RENDER_SCALE,
+            "Deferred Normal Surface",
         );
 
         let quad_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("BG"),
+                label: Some("Deferred Target Bind Group Layout"),
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
@@ -437,6 +483,25 @@ impl State {
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler {
+                            filtering: true,
+                            comparison: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler {
                             filtering: true,
@@ -462,12 +527,23 @@ impl State {
                         binding: 1,
                         resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
                     },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(&specular_texture.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::Sampler(&specular_texture.sampler),
+                    },
                 ],
             });
 
             Material {
                 name: String::from("Output Quad Textures"),
-                textures: HashMap::from_iter([("ss_diffuse".to_owned(), diffuse_texture)]),
+                textures: HashMap::from_iter([
+                    ("ss_diffuse".to_owned(), diffuse_texture),
+                    ("ss_specular".to_owned(), specular_texture),
+                ]),
                 bind_group,
             }
         };
@@ -519,6 +595,13 @@ impl State {
             "Deferred Surface",
         );
 
+        let screen_normal_texture = Texture::create_render_texture(
+            &self.device,
+            &self.surface_config,
+            RENDER_SCALE,
+            "Deferred Normal Surface",
+        );
+
         let quad_bind_group_layout =
             self.device
                 .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -543,6 +626,25 @@ impl State {
                             },
                             count: None,
                         },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler {
+                                filtering: true,
+                                comparison: false,
+                            },
+                            count: None,
+                        },
                     ],
                 });
 
@@ -559,12 +661,23 @@ impl State {
                         binding: 1,
                         resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
                     },
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&screen_normal_texture.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&screen_normal_texture.sampler),
+                    },
                 ],
             });
 
             Material {
                 name: String::from("Output Quad Textures"),
-                textures: HashMap::from_iter([("ss_diffuse".to_owned(), diffuse_texture)]),
+                textures: HashMap::from_iter([
+                    ("ss_diffuse".to_owned(), diffuse_texture),
+                    ("ss_specular".to_owned(), screen_normal_texture),
+                ]),
                 bind_group,
             }
         };
@@ -610,14 +723,24 @@ impl State {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Frame render pass"),
-                color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &self.render_material.textures["ss_diffuse"].view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(self.bg_color),
-                        store: true,
+                color_attachments: &[
+                    wgpu::RenderPassColorAttachment {
+                        view: &self.render_material.textures["ss_diffuse"].view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(self.bg_color),
+                            store: true,
+                        },
                     },
-                }],
+                    wgpu::RenderPassColorAttachment {
+                        view: &self.render_material.textures["ss_specular"].view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(self.bg_color),
+                            store: true,
+                        },
+                    },
+                ],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &self.depth_texture.view,
                     depth_ops: Some(wgpu::Operations {

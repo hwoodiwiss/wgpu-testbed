@@ -18,12 +18,18 @@ fn vertex_main(in: VertexInput) -> VertexOutput {
 }
 
 [[group(0), binding(0)]]
-var frame_texture: texture_2d<f32>;
+var ss_diffuse: texture_2d<f32>;
 [[group(0), binding(1)]]
-var frame_sampler: sampler;
+var ss_diffuse_sampler: sampler;
+
+[[group(0), binding(2)]]
+var ss_normal: texture_2d<f32>;
+[[group(0), binding(3)]]
+var ss_normal_sampler: sampler;
 
 [[stage(fragment)]]
 fn fragment_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-	let object_colour: vec4<f32> = textureSample(frame_texture, frame_sampler, in.tex_coord);
-	return object_colour;
+	let object_colour: vec4<f32> = textureSample(ss_diffuse, ss_diffuse_sampler, in.tex_coord);
+	let object_specular: vec4<f32> = textureSample(ss_normal, ss_normal_sampler, in.tex_coord);
+	return (object_colour * object_specular);
 }
