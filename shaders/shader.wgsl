@@ -90,8 +90,15 @@ var t_normal: texture_2d<f32>;
 [[group(0), binding(3)]]
 var s_normal: sampler;
 
+struct FragmentOutput {
+    [[location(0)]] diffuse: vec4<f32>;
+    [[location(1)]] normal: vec4<f32>;
+};
+
 [[stage(fragment)]]
-fn fragment_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+fn fragment_main(in: VertexOutput) -> FragmentOutput {
+
+    var out: FragmentOutput;
     let object_colour: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
     let object_normal: vec4<f32> = textureSample(t_normal, s_normal, in.tex_coords);
 
@@ -112,7 +119,9 @@ fn fragment_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     let specular_strength = pow(max(dot(tangent_normal, half_dir), 0.0), 32.0);
     let specular_colour = specular_strength * light.colour;
 
-    let result = (ambient_colour + diffuse_colour + specular_colour) * object_colour.xyz;
+    let result = (ambient_colour + diffuse_colour + specular_colour);
 
-    return vec4<f32>(result, object_colour.a);
+    out.diffuse = vec4<f32>(object_colour);
+    out.normal = vec4<f32>(result, 1.0);
+    return out;
 }

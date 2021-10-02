@@ -1,4 +1,6 @@
 use anyhow::*;
+use std::collections::HashMap;
+use std::iter::FromIterator;
 use std::{ops::Range, path::Path};
 
 use crate::file_reader::FileReader;
@@ -7,6 +9,34 @@ use crate::texture::Texture;
 use crate::vertex::Vertex;
 
 use wgpu::util::DeviceExt;
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct QuadVertex {
+    position: [f32; 2],
+    tex_coords: [f32; 2],
+}
+
+impl Vertex for QuadVertex {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<QuadVertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x2,
+                    offset: 0,
+                    shader_location: 0,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x2,
+                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                },
+            ],
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -57,8 +87,7 @@ impl Vertex for ModelVertex {
 
 pub struct Material {
     pub name: String,
-    pub diffuse_texture: Texture,
-    pub normal_texture: Texture,
+    pub textures: HashMap<String, Texture>,
     pub bind_group: wgpu::BindGroup,
 }
 
@@ -276,8 +305,10 @@ impl ModelLoader {
 
             materials.push(Material {
                 name: mat.name,
-                diffuse_texture,
-                normal_texture,
+                textures: HashMap::from_iter([
+                    ("diffuse".to_owned(), diffuse_texture),
+                    ("normal".to_owned(), normal_texture),
+                ]),
                 bind_group,
             })
         }
@@ -374,6 +405,49 @@ impl ModelLoader {
 
         Ok(Model { meshes, materials })
     }
+
+    pub fn create_screen_quad_mesh(device: &wgpu::Device) -> Mesh {
+        let quad_verts = [
+            QuadVertex {
+                position: [-1.0, 1.0],
+                tex_coords: [0.0, 0.0],
+            },
+            QuadVertex {
+                position: [1.0, 1.0],
+                tex_coords: [1.0, 0.0],
+            },
+            QuadVertex {
+                position: [1.0, -1.0],
+                tex_coords: [1.0, 1.0],
+            },
+            QuadVertex {
+                position: [-1.0, -1.0],
+                tex_coords: [0.0, 1.0],
+            },
+        ];
+
+        let quad_indices = [0u32, 1u32, 2u32, 0u32, 2u32, 3u32];
+
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Output Vertex Buffer"),
+            contents: bytemuck::cast_slice(&quad_verts),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::STORAGE,
+        });
+
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Output Index Buffer"),
+            contents: bytemuck::cast_slice(&quad_indices),
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::STORAGE,
+        });
+
+        Mesh {
+            name: String::from("Output Quad"),
+            vertex_buffer,
+            index_buffer,
+            num_elements: quad_indices.len() as u32,
+            material: 0,
+        }
+    }
 }
 
 pub trait DrawModel<'a, 'b>
@@ -422,6 +496,11 @@ where
         uniforms: &'b wgpu::BindGroup,
         light: &'b wgpu::BindGroup,
     ) {
+        self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+        self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        self.set_bind_group(0, &material.bind_group, &[]);
+        self.set_bind_group(1, &uniforms, &[]);
+        self.set_bind_group(2, &light, &[]);
         self.draw_mesh_instanced(mesh, material, 0..1, uniforms, light);
     }
 

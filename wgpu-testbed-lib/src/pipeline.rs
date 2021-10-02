@@ -37,10 +37,10 @@ impl<T: Bindable> Binder<T> {
 pub fn create_render_pipeline(
     device: &wgpu::Device,
     layout: &wgpu::PipelineLayout,
-    colour_format: wgpu::TextureFormat,
     depth_format: Option<wgpu::TextureFormat>,
     vertex_layouts: &[wgpu::VertexBufferLayout],
     shader: wgpu::ShaderModuleDescriptor,
+    targets: &[wgpu::ColorTargetState],
     label: Option<&str>,
 ) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(&shader);
@@ -56,14 +56,7 @@ pub fn create_render_pipeline(
         fragment: Some(wgpu::FragmentState {
             module: &shader,
             entry_point: "fragment_main",
-            targets: &[wgpu::ColorTargetState {
-                format: colour_format,
-                blend: Some(wgpu::BlendState {
-                    color: wgpu::BlendComponent::REPLACE,
-                    alpha: wgpu::BlendComponent::REPLACE,
-                }),
-                write_mask: wgpu::ColorWrites::ALL,
-            }],
+            targets: targets,
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
