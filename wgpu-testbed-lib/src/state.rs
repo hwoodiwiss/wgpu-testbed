@@ -73,6 +73,7 @@ impl State {
             .request_adapter(&wgpu::RequestAdapterOptions {
                 compatible_surface: Some(&surface),
                 power_preference: PowerPreference::HighPerformance,
+                force_fallback_adapter: false,
             })
             .await
             .expect("Could not create adapter instance!");
