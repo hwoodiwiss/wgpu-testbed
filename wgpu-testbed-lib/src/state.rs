@@ -36,7 +36,7 @@ const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
     INSTANCES_PER_ROW as f32 * 0.5,
 );
 
-const RENDER_SCALE: f32 = 1.0;
+const RENDER_SCALE: f32 = 2.0;
 pub struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -110,7 +110,7 @@ impl State {
                         binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
@@ -558,56 +558,10 @@ impl State {
             "Deferred Normal Surface",
         );
 
-        let output_bind_group_layout =
-            self.device
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("BG"),
-                    entries: &[
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Texture {
-                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                view_dimension: wgpu::TextureViewDimension::D2,
-                                multisampled: false,
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Sampler {
-                                filtering: true,
-                                comparison: false,
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 2,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Texture {
-                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                view_dimension: wgpu::TextureViewDimension::D2,
-                                multisampled: false,
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 3,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Sampler {
-                                filtering: true,
-                                comparison: false,
-                            },
-                            count: None,
-                        },
-                    ],
-                });
-
         self.render_material = {
             let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
-                layout: &output_bind_group_layout,
+                layout: &self.output_render_pipeline.get_bind_group_layout(0),
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -618,11 +572,11 @@ impl State {
                         resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 0,
+                        binding: 2,
                         resource: wgpu::BindingResource::TextureView(&screen_normal_texture.view),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 1,
+                        binding: 3,
                         resource: wgpu::BindingResource::Sampler(&screen_normal_texture.sampler),
                     },
                 ],
