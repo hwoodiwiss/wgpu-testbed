@@ -36,7 +36,7 @@ const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
     INSTANCES_PER_ROW as f32 * 0.5,
 );
 
-const RENDER_SCALE: f32 = 2.0;
+const RENDER_SCALE: f32 = 1.0;
 pub struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -73,6 +73,7 @@ impl State {
             .request_adapter(&wgpu::RequestAdapterOptions {
                 compatible_surface: Some(&surface),
                 power_preference: PowerPreference::HighPerformance,
+                force_fallback_adapter: false,
             })
             .await
             .expect("Could not create adapter instance!");
@@ -381,7 +382,7 @@ impl State {
                         binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
@@ -400,7 +401,7 @@ impl State {
                         binding: 2,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
@@ -467,57 +468,12 @@ impl State {
             "Deferred Normal Surface",
         );
 
-        let quad_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Deferred Target Bind Group Layout"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler {
-                            filtering: true,
-                            comparison: false,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 3,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler {
-                            filtering: true,
-                            comparison: false,
-                        },
-                        count: None,
-                    },
-                ],
-            });
-
         let screen_quad = ModelLoader::create_screen_quad_mesh(&device);
 
         let render_material = {
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
-                layout: &quad_bind_group_layout,
+                layout: &output_bindgroup_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -602,7 +558,7 @@ impl State {
             "Deferred Normal Surface",
         );
 
-        let quad_bind_group_layout =
+        let output_bind_group_layout =
             self.device
                 .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                     label: Some("BG"),
@@ -611,7 +567,7 @@ impl State {
                             binding: 0,
                             visibility: wgpu::ShaderStages::FRAGMENT,
                             ty: wgpu::BindingType::Texture {
-                                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
                                 view_dimension: wgpu::TextureViewDimension::D2,
                                 multisampled: false,
                             },
@@ -630,7 +586,7 @@ impl State {
                             binding: 2,
                             visibility: wgpu::ShaderStages::FRAGMENT,
                             ty: wgpu::BindingType::Texture {
-                                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
                                 view_dimension: wgpu::TextureViewDimension::D2,
                                 multisampled: false,
                             },
@@ -651,7 +607,7 @@ impl State {
         self.render_material = {
             let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
-                layout: &quad_bind_group_layout,
+                layout: &output_bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -784,13 +740,13 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.output_render_pipeline);
+            render_pass.set_bind_group(0, &self.render_material.bind_group, &[]);
 
             render_pass.set_vertex_buffer(0, self.screen_quad.vertex_buffer.slice(..));
             render_pass.set_index_buffer(
                 self.screen_quad.index_buffer.slice(..),
                 wgpu::IndexFormat::Uint32,
             );
-            render_pass.set_bind_group(0, &self.render_material.bind_group, &[]);
             render_pass.draw_indexed(0..self.screen_quad.num_elements, 0, 0..1);
         }
 
