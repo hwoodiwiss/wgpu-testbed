@@ -36,7 +36,7 @@ const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
     INSTANCES_PER_ROW as f32 * 0.5,
 );
 
-const RENDER_SCALE: f32 = 1.0;
+const RENDER_SCALE: f32 = 2.0;
 pub struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
