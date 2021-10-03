@@ -43,5 +43,6 @@ struct FragmentOutput {
 fn fragment_main(in: VertexOutput) -> FragmentOutput {
     var out: FragmentOutput;
     out.diffuse = vec4<f32>(in.colour, 1.0);
+    out.normal = vec4<f32>(1.0);
     return out;
 }
