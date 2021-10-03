@@ -1513,8 +1513,9 @@ dependencies = [
 
 [[package]]
 name = "tobj"
-version = "3.1.0"
-source = "git+https://github.com/hwoodiwiss/tobj?branch=add-async-obj-load-buf#70922e499839598ff50048c36816cb12ed093ca5"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "267a53ebc1139c69d3feedc33a381c382b2e3b0c47f44f48679e90c4a69b8dac"
 dependencies = [
  "ahash 0.7.4",
 ]
