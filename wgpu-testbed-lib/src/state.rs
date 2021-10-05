@@ -193,7 +193,7 @@ impl State {
         });
 
         // Cornflour blue, because I 'member XNA
-        let bg_color = rgb_to_normalized(100, 149, 237);
+        let bg_color = rgb_to_normalized(0, 0, 0);
 
         let light = Light {
             position: [2.0, 2.0, 2.0],
@@ -657,10 +657,13 @@ impl State {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: true,
                     }),
-                    stencil_ops: None,
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0xFF),
+                        store: true,
+                    }),
                 }),
             });
-
+            render_pass.set_stencil_reference(32);
             render_pass.set_pipeline(&self.light_render_pipeline);
             render_pass.draw_light_model(
                 &self.obj_model,
@@ -669,7 +672,7 @@ impl State {
             );
 
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-
+            render_pass.set_stencil_reference(64);
             render_pass.set_pipeline(&self.deferred_render_pipeline);
             render_pass.draw_model_instanced(
                 &self.obj_model,
