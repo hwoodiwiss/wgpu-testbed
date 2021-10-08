@@ -616,7 +616,7 @@ impl State {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let frame = self.surface.get_current_frame()?.output;
+        let frame = self.surface.get_current_texture()?;
 
         let mut encoder = self
             .device
@@ -708,6 +708,7 @@ impl State {
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
+        frame.present();
         Ok(())
     }
 }
