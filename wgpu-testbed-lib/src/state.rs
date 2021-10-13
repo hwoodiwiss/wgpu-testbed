@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::iter::FromIterator;
+use std::rc::Rc;
 
 use crate::camera::CameraController;
 use crate::file_reader::FileReader;
 use crate::instance::InstanceRaw;
-use crate::pipeline::{self, create_render_pipeline};
+use crate::pipeline::RenderPipelineBuilder;
 use crate::uniform::Uniforms;
 use crate::{instance::Instance, light::Light};
 use cgmath::*;
@@ -304,13 +305,16 @@ impl State {
                 source: wgpu::ShaderSource::Wgsl(shader_str.into()),
             };
 
-            pipeline::create_render_pipeline(
-                &device,
-                &render_pipeline_layout,
-                Some(texture::Texture::DEPTH_FORMAT),
-                &[model::ModelVertex::desc(), InstanceRaw::desc()],
-                shader,
-                &[
+            let shader_module = Rc::new(device.create_shader_module(&shader));
+            RenderPipelineBuilder::create("Render Pipeline")
+                .with_layout(render_pipeline_layout)
+                .with_vertex_shader(
+                    "vertex_main",
+                    shader_module.clone(),
+                    &[model::ModelVertex::desc(), InstanceRaw::desc()],
+                )
+                .with_fragment_shader("fragment_main", shader_module.clone())
+                .with_render_targets(&[
                     wgpu::ColorTargetState {
                         format: surface_config.format,
                         blend: Some(wgpu::BlendState {
@@ -327,9 +331,29 @@ impl State {
                         }),
                         write_mask: wgpu::ColorWrites::ALL,
                     },
-                ],
-                Some("Render Pipeline"),
-            )
+                ])
+                .with_depth(
+                    texture::Texture::DEPTH_FORMAT,
+                    true,
+                    wgpu::CompareFunction::LessEqual,
+                )
+                .with_stencil(
+                    wgpu::StencilFaceState {
+                        compare: wgpu::CompareFunction::Always,
+                        fail_op: wgpu::StencilOperation::Keep,
+                        depth_fail_op: wgpu::StencilOperation::Keep,
+                        pass_op: wgpu::StencilOperation::Replace,
+                    },
+                    wgpu::StencilFaceState {
+                        compare: wgpu::CompareFunction::Never,
+                        fail_op: wgpu::StencilOperation::Keep,
+                        depth_fail_op: wgpu::StencilOperation::Keep,
+                        pass_op: wgpu::StencilOperation::Keep,
+                    },
+                    None,
+                    None,
+                )
+                .build(&device)
         };
 
         let light_render_pipeline = {
@@ -346,14 +370,16 @@ impl State {
                 label: Some("Light Shader"),
                 source: wgpu::ShaderSource::Wgsl(shader_str.into()),
             };
-
-            pipeline::create_render_pipeline(
-                &device,
-                &layout,
-                Some(texture::Texture::DEPTH_FORMAT),
-                &[model::ModelVertex::desc()],
-                shader,
-                &[
+            let shader_module = Rc::new(device.create_shader_module(&shader));
+            RenderPipelineBuilder::create("Light render pipeline")
+                .with_layout(layout)
+                .with_vertex_shader(
+                    "vertex_main",
+                    shader_module.clone(),
+                    &[model::ModelVertex::desc()],
+                )
+                .with_fragment_shader("fragment_main", shader_module.clone())
+                .with_render_targets(&[
                     wgpu::ColorTargetState {
                         format: surface_config.format,
                         blend: Some(wgpu::BlendState {
@@ -370,9 +396,29 @@ impl State {
                         }),
                         write_mask: wgpu::ColorWrites::ALL,
                     },
-                ],
-                Some("Light render pipeline"),
-            )
+                ])
+                .with_depth(
+                    texture::Texture::DEPTH_FORMAT,
+                    true,
+                    wgpu::CompareFunction::LessEqual,
+                )
+                .with_stencil(
+                    wgpu::StencilFaceState {
+                        compare: wgpu::CompareFunction::Always,
+                        fail_op: wgpu::StencilOperation::Keep,
+                        depth_fail_op: wgpu::StencilOperation::Keep,
+                        pass_op: wgpu::StencilOperation::Replace,
+                    },
+                    wgpu::StencilFaceState {
+                        compare: wgpu::CompareFunction::Never,
+                        fail_op: wgpu::StencilOperation::Keep,
+                        depth_fail_op: wgpu::StencilOperation::Keep,
+                        pass_op: wgpu::StencilOperation::Keep,
+                    },
+                    None,
+                    None,
+                )
+                .build(&device)
         };
 
         let output_bindgroup_layout =
@@ -436,22 +482,24 @@ impl State {
                 source: wgpu::ShaderSource::Wgsl(shader_str.into()),
             };
 
-            create_render_pipeline(
-                &device,
-                &layout,
-                None,
-                &[QuadVertex::desc()],
-                shader,
-                &[wgpu::ColorTargetState {
+            let shader_module = Rc::new(device.create_shader_module(&shader));
+            RenderPipelineBuilder::create("Output Pipeline")
+                .with_layout(layout)
+                .with_vertex_shader(
+                    "vertex_main",
+                    Rc::clone(&shader_module),
+                    &[QuadVertex::desc()],
+                )
+                .with_fragment_shader("fragment_main", Rc::clone(&shader_module))
+                .with_render_targets(&[wgpu::ColorTargetState {
                     format: surface_config.format,
                     blend: Some(wgpu::BlendState {
                         color: wgpu::BlendComponent::REPLACE,
                         alpha: wgpu::BlendComponent::REPLACE,
                     }),
                     write_mask: wgpu::ColorWrites::ALL,
-                }],
-                Some("Output Pipeline"),
-            )
+                }])
+                .build(&device)
         };
 
         let diffuse_texture = Texture::create_render_texture(
