@@ -62,6 +62,7 @@ pub struct State {
     light_bind_group: wgpu::BindGroup,
     light_render_pipeline: wgpu::RenderPipeline,
     output_render_pipeline: wgpu::RenderPipeline,
+    invert_render_pipeline: wgpu::RenderPipeline,
 }
 
 impl State {
@@ -502,6 +503,108 @@ impl State {
                 .build(&device)
         };
 
+        let invert_bindgroup_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler {
+                            filtering: true,
+                            comparison: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler {
+                            filtering: true,
+                            comparison: false,
+                        },
+                        count: None,
+                    },
+                ],
+                label: None,
+            });
+
+        let shader_buffer = FileReader::read_file("shaders/invert_stenciled.wgsl").await;
+        let shader_str =
+            std::str::from_utf8(shader_buffer.as_slice()).expect("Failed to load shader");
+
+        let invert_render_pipeline = {
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Invert pipeline layout desc"),
+                bind_group_layouts: &[&invert_bindgroup_layout],
+                push_constant_ranges: &[],
+            });
+
+            let shader = wgpu::ShaderModuleDescriptor {
+                label: Some("Invert Shader"),
+                source: wgpu::ShaderSource::Wgsl(shader_str.into()),
+            };
+
+            let shader_module = Rc::new(device.create_shader_module(&shader));
+            RenderPipelineBuilder::create("Invert Pipeline")
+                .with_layout(layout)
+                .with_vertex_shader(
+                    "vertex_main",
+                    Rc::clone(&shader_module),
+                    &[QuadVertex::desc()],
+                )
+                .with_fragment_shader("fragment_main", Rc::clone(&shader_module))
+                .with_render_targets(&[wgpu::ColorTargetState {
+                    format: surface_config.format,
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent::REPLACE,
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }])
+                .with_depth(
+                    texture::Texture::DEPTH_FORMAT,
+                    false,
+                    wgpu::CompareFunction::Always,
+                )
+                .with_stencil(
+                    wgpu::StencilFaceState {
+                        compare: wgpu::CompareFunction::Never,
+                        fail_op: wgpu::StencilOperation::Keep,
+                        depth_fail_op: wgpu::StencilOperation::Keep,
+                        pass_op: wgpu::StencilOperation::Keep,
+                    },
+                    wgpu::StencilFaceState {
+                        compare: wgpu::CompareFunction::Equal,
+                        fail_op: wgpu::StencilOperation::Keep,
+                        depth_fail_op: wgpu::StencilOperation::Keep,
+                        pass_op: wgpu::StencilOperation::Keep,
+                    },
+                    None,
+                    None,
+                )
+                .build(&device)
+        };
+
         let diffuse_texture = Texture::create_render_texture(
             &device,
             &surface_config,
@@ -576,6 +679,7 @@ impl State {
             output_render_pipeline,
             screen_quad,
             render_material,
+            invert_render_pipeline,
         }
     }
 
@@ -711,7 +815,7 @@ impl State {
                     }),
                 }),
             });
-            render_pass.set_stencil_reference(32);
+            render_pass.set_stencil_reference(0x20);
             render_pass.set_pipeline(&self.light_render_pipeline);
             render_pass.draw_light_model(
                 &self.obj_model,
@@ -720,7 +824,7 @@ impl State {
             );
 
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-            render_pass.set_stencil_reference(64);
+            render_pass.set_stencil_reference(0x40);
             render_pass.set_pipeline(&self.deferred_render_pipeline);
             render_pass.draw_model_instanced(
                 &self.obj_model,
@@ -729,15 +833,81 @@ impl State {
                 &self.light_bind_group,
             );
         }
+        let tmp_texture = Texture::create_render_texture(
+            &self.device,
+            &self.surface_config,
+            RENDER_SCALE,
+            "Temp Target",
+        );
+
+        encoder.copy_texture_to_texture(
+            self.render_material.textures["ss_diffuse"]
+                .texture
+                .as_image_copy(),
+            tmp_texture.texture.as_image_copy(),
+            wgpu::Extent3d {
+                width: (self.surface_config.width as f32 * RENDER_SCALE) as u32,
+                height: (self.surface_config.height as f32 * RENDER_SCALE) as u32,
+                depth_or_array_layers: 1,
+            },
+        );
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Frame render pass"),
+                label: Some("Invert cubes render pass"),
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &tmp_texture.view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    }),
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    }),
+                }),
+            });
+
+            render_pass.set_pipeline(&self.invert_render_pipeline);
+            render_pass.set_bind_group(0, &self.render_material.bind_group, &[]);
+
+            render_pass.set_vertex_buffer(0, self.screen_quad.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(
+                self.screen_quad.index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
+            render_pass.set_stencil_reference(0x40);
+            render_pass.draw_indexed(0..self.screen_quad.num_elements, 0, 0..1);
+        }
+
+        encoder.copy_texture_to_texture(
+            tmp_texture.texture.as_image_copy(),
+            self.render_material.textures["ss_diffuse"]
+                .texture
+                .as_image_copy(),
+            wgpu::Extent3d {
+                width: (self.surface_config.width as f32 * RENDER_SCALE) as u32,
+                height: (self.surface_config.height as f32 * RENDER_SCALE) as u32,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Deferred render pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
                     view: &frame_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(self.bg_color),
+                        load: wgpu::LoadOp::Load,
                         store: true,
                     },
                 }],
