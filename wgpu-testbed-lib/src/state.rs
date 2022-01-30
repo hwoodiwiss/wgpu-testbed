@@ -193,6 +193,7 @@ impl State {
             position: [2.0, 2.0, 2.0],
             _padding: 0.0,
             colour: [1.0, 1.0, 1.0],
+            _padding2: 0.0,
         };
 
         let light_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
