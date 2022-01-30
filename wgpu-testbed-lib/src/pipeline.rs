@@ -48,6 +48,7 @@ pub fn create_render_pipeline(
     return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label,
         layout: Some(layout),
+        multiview: None,
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: "vertex_main",
@@ -64,7 +65,7 @@ pub fn create_render_pipeline(
             front_face: wgpu::FrontFace::Ccw,
             cull_mode: None,
             polygon_mode: wgpu::PolygonMode::Fill,
-            clamp_depth: false,
+            unclipped_depth: false,
             conservative: false,
         },
         depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {

@@ -10,7 +10,7 @@ use crate::{instance::Instance, light::Light};
 use cgmath::*;
 
 use wgpu::util::DeviceExt;
-use wgpu::PowerPreference;
+use wgpu::{PowerPreference, SamplerBindingType};
 use winit::{event::WindowEvent, window::Window};
 
 use crate::camera::Camera;
@@ -119,10 +119,7 @@ impl State {
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler {
-                            filtering: true,
-                            comparison: false,
-                        },
+                        ty: wgpu::BindingType::Sampler(SamplerBindingType::Filtering),
                         count: None,
                     },
                     wgpu::BindGroupLayoutEntry {
@@ -138,10 +135,7 @@ impl State {
                     wgpu::BindGroupLayoutEntry {
                         binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler {
-                            filtering: true,
-                            comparison: false,
-                        },
+                        ty: wgpu::BindingType::Sampler(SamplerBindingType::Filtering),
                         count: None,
                     },
                 ],
@@ -391,10 +385,7 @@ impl State {
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler {
-                            filtering: true,
-                            comparison: false,
-                        },
+                        ty: wgpu::BindingType::Sampler(SamplerBindingType::Filtering),
                         count: None,
                     },
                     wgpu::BindGroupLayoutEntry {
@@ -410,10 +401,7 @@ impl State {
                     wgpu::BindGroupLayoutEntry {
                         binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler {
-                            filtering: true,
-                            comparison: false,
-                        },
+                        ty: wgpu::BindingType::Sampler(SamplerBindingType::Filtering),
                         count: None,
                     },
                 ],

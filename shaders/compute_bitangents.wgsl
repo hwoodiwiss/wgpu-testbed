@@ -8,16 +8,16 @@ struct ModelVertex {
 	pad0_: u32; pad1_: u32;
 };
 
-[[block]] struct ComputeInfo {
+struct ComputeInfo {
 	num_vertices: u32;
 	num_indicies: u32;
 };
 
-[[block]] struct ModelVetexBuffer {
+struct ModelVetexBuffer {
 	verts: [[stride(64)]] array<ModelVertex>;
 };
 
-[[block]] struct IndexBuffer {
+struct IndexBuffer {
 	indicies: [[stride(4)]] array<u32>;
 };
 
