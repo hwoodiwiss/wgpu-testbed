@@ -10,6 +10,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::state::State;
 
+mod bathymetry_loader;
 mod camera;
 mod file_reader;
 mod instance;
