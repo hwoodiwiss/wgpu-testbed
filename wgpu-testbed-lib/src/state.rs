@@ -92,9 +92,7 @@ impl State {
 
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface
-                .get_preferred_format(&adapter)
-                .expect("Could not get surface format!"),
+            format: surface.get_supported_formats(&adapter)[0],
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
@@ -306,22 +304,22 @@ impl State {
                 &[model::ModelVertex::desc(), InstanceRaw::desc()],
                 shader,
                 &[
-                    wgpu::ColorTargetState {
+                    Some(wgpu::ColorTargetState {
                         format: surface_config.format,
                         blend: Some(wgpu::BlendState {
                             color: wgpu::BlendComponent::REPLACE,
                             alpha: wgpu::BlendComponent::REPLACE,
                         }),
                         write_mask: wgpu::ColorWrites::ALL,
-                    },
-                    wgpu::ColorTargetState {
+                    }),
+                    Some(wgpu::ColorTargetState {
                         format: surface_config.format,
                         blend: Some(wgpu::BlendState {
                             color: wgpu::BlendComponent::REPLACE,
                             alpha: wgpu::BlendComponent::REPLACE,
                         }),
                         write_mask: wgpu::ColorWrites::ALL,
-                    },
+                    }),
                 ],
                 Some("Render Pipeline"),
             )
@@ -349,22 +347,22 @@ impl State {
                 &[model::ModelVertex::desc()],
                 shader,
                 &[
-                    wgpu::ColorTargetState {
+                    Some(wgpu::ColorTargetState {
                         format: surface_config.format,
                         blend: Some(wgpu::BlendState {
                             color: wgpu::BlendComponent::REPLACE,
                             alpha: wgpu::BlendComponent::REPLACE,
                         }),
                         write_mask: wgpu::ColorWrites::ALL,
-                    },
-                    wgpu::ColorTargetState {
+                    }),
+                    Some(wgpu::ColorTargetState {
                         format: surface_config.format,
                         blend: Some(wgpu::BlendState {
                             color: wgpu::BlendComponent::REPLACE,
                             alpha: wgpu::BlendComponent::REPLACE,
                         }),
                         write_mask: wgpu::ColorWrites::ALL,
-                    },
+                    }),
                 ],
                 Some("Light render pipeline"),
             )
@@ -431,14 +429,14 @@ impl State {
                 None,
                 &[QuadVertex::desc()],
                 shader,
-                &[wgpu::ColorTargetState {
+                &[Some(wgpu::ColorTargetState {
                     format: surface_config.format,
                     blend: Some(wgpu::BlendState {
                         color: wgpu::BlendComponent::REPLACE,
                         alpha: wgpu::BlendComponent::REPLACE,
                     }),
                     write_mask: wgpu::ColorWrites::ALL,
-                }],
+                })],
                 Some("Output Pipeline"),
             )
         };
@@ -623,22 +621,22 @@ impl State {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Frame render pass"),
                 color_attachments: &[
-                    wgpu::RenderPassColorAttachment {
+                    Some(wgpu::RenderPassColorAttachment {
                         view: &self.render_material.textures["ss_diffuse"].view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(self.bg_color),
                             store: true,
                         },
-                    },
-                    wgpu::RenderPassColorAttachment {
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
                         view: &self.render_material.textures["ss_specular"].view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(self.bg_color),
                             store: true,
                         },
-                    },
+                    }),
                 ],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &self.depth_texture.view,
@@ -674,14 +672,14 @@ impl State {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Frame render pass"),
-                color_attachments: &[wgpu::RenderPassColorAttachment {
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &frame_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(self.bg_color),
                         store: true,
                     },
-                }],
+                })],
                 depth_stencil_attachment: None,
             });
 
