@@ -40,10 +40,10 @@ pub fn create_render_pipeline(
     depth_format: Option<wgpu::TextureFormat>,
     vertex_layouts: &[wgpu::VertexBufferLayout],
     shader: wgpu::ShaderModuleDescriptor,
-    targets: &[wgpu::ColorTargetState],
+    targets: &[Option<wgpu::ColorTargetState>],
     label: Option<&str>,
 ) -> wgpu::RenderPipeline {
-    let shader = device.create_shader_module(&shader);
+    let shader = device.create_shader_module(shader);
 
     return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label,
@@ -101,7 +101,7 @@ pub fn create_render_pipeline(
 pub fn create_compute_pipeline(
     device: &wgpu::Device,
     bind_group_layouts: &[&wgpu::BindGroupLayout],
-    shader: &wgpu::ShaderModuleDescriptor,
+    shader: wgpu::ShaderModuleDescriptor,
     label: Option<&str>,
 ) -> wgpu::ComputePipeline {
     let shader = device.create_shader_module(shader);
