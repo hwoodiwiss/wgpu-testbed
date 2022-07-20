@@ -1,36 +1,36 @@
 
 struct ModelVertex {
-	x: f32; y: f32; z: f32;
-	uv: f32; uw: f32;
-	nx: f32; ny: f32; nz: f32;
-	tx: f32; ty: f32; tz: f32;
-	bx: f32; by: f32; bz: f32;
-	pad0_: u32; pad1_: u32;
-};
+	x: f32, y: f32, z: f32,
+	uv: f32, uw: f32,
+	nx: f32, ny: f32, nz: f32,
+	tx: f32, ty: f32, tz: f32,
+	bx: f32, by: f32, bz: f32,
+	pad0_: u32, pad1_: u32,
+}
 
 struct ComputeInfo {
-	num_vertices: u32;
-	num_indicies: u32;
-};
+	num_vertices: u32,
+	num_indicies: u32,
+}
 
 struct ModelVetexBuffer {
-	verts: [[stride(64)]] array<ModelVertex>;
-};
+	verts: array<ModelVertex>
+}
 
 struct IndexBuffer {
-	indicies: [[stride(4)]] array<u32>;
-};
+	indicies: array<u32>
+}
 
-[[group(0), binding(0)]]
+@group(0) @binding(0)
 var<storage> src_verts: ModelVetexBuffer;
 
-[[group(0), binding(1)]]
+@group(0) @binding(1)
 var<storage, read_write> dst_verts: ModelVetexBuffer;
 
-[[group(0), binding(2)]]
+@group(0) @binding(2)
 var<storage> idx_buffer: IndexBuffer;
 
-[[group(0), binding(3)]]
+@group(0) @binding(3)
 var<uniform> info: ComputeInfo;
 
 fn getPos(vert: ModelVertex) -> vec3<f32> {
@@ -104,8 +104,8 @@ fn calcTangentBitangent(vert_idx: u32) -> ModelVertex {
 	return curr_vert;
 }
 
-[[stage(compute), workgroup_size(64, 1, 1)]]
-fn main([[builtin(global_invocation_id)]] global_ix: vec3<u32>) {
+@compute @workgroup_size(64, 1, 1)
+fn main(@builtin(global_invocation_id) global_ix: vec3<u32>) {
 	let vert_idx = global_ix.x;
 	let result = calcTangentBitangent(vert_idx);
 	dst_verts.verts[vert_idx] = result;
