@@ -20,7 +20,7 @@ use crate::texture::{self, Texture};
 use crate::vertex::Vertex;
 
 fn rgb_to_normalized(r: u8, g: u8, b: u8) -> wgpu::Color {
-    // Wish this could be const, but cant do fp arithmatic in const fn
+    // Wish this could be const, but cant do fp arithmetic in const fn
     wgpu::Color {
         r: r as f64 / 255f64,
         g: g as f64 / 255f64,
@@ -96,13 +96,14 @@ impl State {
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
 
         surface.configure(&device, &surface_config);
 
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Texure bind group layout"),
+                label: Some("Texture bind group layout"),
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
