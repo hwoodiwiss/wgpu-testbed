@@ -10,7 +10,7 @@ use crate::{instance::Instance, light::Light};
 use cgmath::*;
 
 use wgpu::util::DeviceExt;
-use wgpu::{PowerPreference, SamplerBindingType};
+use wgpu::{InstanceDescriptor, PowerPreference, SamplerBindingType};
 use winit::{event::WindowEvent, window::Window};
 
 use crate::camera::Camera;
@@ -66,9 +66,13 @@ pub struct State {
 impl State {
     pub async fn new(window: &Window) -> Self {
         let size = window.inner_size();
-
-        let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
-        let surface = unsafe { instance.create_surface(window) };
+        let instance_desc = InstanceDescriptor::default();
+        let instance = wgpu::Instance::new(instance_desc);
+        let surface = unsafe {
+            instance
+                .create_surface(window)
+                .expect("Expected surface from window")
+        };
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 compatible_surface: Some(&surface),
@@ -89,14 +93,15 @@ impl State {
             )
             .await
             .expect("Could not get device from adapter!");
-
+        let capabilities = surface.get_capabilities(&adapter);
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_supported_formats(&adapter)[0],
+            format: capabilities.formats[0],
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: vec![wgpu::TextureFormat::Bgra8UnormSrgb],
         };
 
         surface.configure(&device, &surface_config);
