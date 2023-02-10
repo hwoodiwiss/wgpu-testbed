@@ -7,9 +7,7 @@ on:
         type: string
     secrets:
       swa-api-token:
-        description: "The Azure Static WebApps API Token"
         required: true
-        type: string
       gh-token:
         required: true
 
