@@ -22,6 +22,7 @@ jobs:
     with:
       artifact-name: "webapp-build"
       swa-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AGREEABLE_DUNE_08FACD403 }}
+    secrets: inherit
     if: |
       (github.event_name == 'push' 
       || (github.event_name == 'pull_request' && github.event.action != 'closed'))
