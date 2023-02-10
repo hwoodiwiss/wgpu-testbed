@@ -14,26 +14,26 @@ jobs:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
     name: Build WebApp
-     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
-      - name: Install Wasm-Pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      - name: Build Wasm Project
-        run: |
-          cd wgpu-testbed-lib
-          RUSTFLAGS=--cfg=web_sys_unstable_apis wasm-pack build
-          cd ..
-      - name: Build Web Project
-        run: |
-          cd wgpu-testbed-webapp
-          yarn install
-          yarn build
-      - uses: actions/upload-artifact@v2
-        with:
-          name: webapp-build
-          path: wgpu-testbed-webapp/dist
+    steps:
+     - uses: actions/checkout@v3
+       with:
+         submodules: true
+     - name: Install Wasm-Pack
+       run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+     - name: Build Wasm Project
+       run: |
+         cd wgpu-testbed-lib
+         RUSTFLAGS=--cfg=web_sys_unstable_apis wasm-pack build
+         cd ..
+     - name: Build Web Project
+       run: |
+         cd wgpu-testbed-webapp
+         yarn install
+         yarn build
+     - uses: actions/upload-artifact@v2
+       with:
+         name: webapp-build
+         path: wgpu-testbed-webapp/dist
 
   deploy:
     if: |
@@ -41,6 +41,7 @@ jobs:
       || (github.event_name == 'pull_request' && github.event.action != 'closed'))
        && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    depends-on: ["build"]
     name: Deploy WebApp
     steps:
       - uses: actions/download-artifact@v2
