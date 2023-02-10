@@ -1,0 +1,31 @@
+on:
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: "The name of the artifact to download for this deployment"
+        required: true
+        type: string
+    secrets:
+      swa-api-token:
+        required: true
+      gh-token:
+        required: true
+
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy WebApp
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ inputs.artifact-name }}
+      - name: Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.swa-api-token }}
+          repo_token: ${{ secrets.gh-token }}
+          action: "upload"
+          app_location: "."
+          skip_app_build: true

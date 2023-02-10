@@ -1,0 +1,34 @@
+on:
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: "The name of the artifact to create from this build"
+        required: true
+        type: string
+  
+jobs:
+  build:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Build WebApp
+    steps:
+     - name: Checkout Code
+       uses: actions/checkout@v3
+       with:
+         submodules: true
+     - name: Install Wasm-Pack
+       run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+     - name: Build Wasm Project
+       run: |
+         cd wgpu-testbed-lib
+         RUSTFLAGS=--cfg=web_sys_unstable_apis wasm-pack build
+         cd ..
+     - name: Build Web Project
+       run: |
+         cd wgpu-testbed-webapp
+         yarn install
+         yarn build
+     - uses: actions/upload-artifact@v2
+       with:
+         name: ${{ inputs.artifact-name }}
+         path: wgpu-testbed-webapp/dist
