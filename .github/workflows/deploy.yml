@@ -10,7 +10,7 @@ on:
         description: "The Azure Static WebApps API Token"
         required: true
         type: string
-      GITHUB_TOKEN:
+      gh-token:
         required: true
 
 
@@ -27,7 +27,7 @@ jobs:
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.swa-api-token }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.gh-token }}
           action: "upload"
           app_location: "."
           skip_app_build: true

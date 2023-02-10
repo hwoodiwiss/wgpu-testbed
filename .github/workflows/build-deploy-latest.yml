@@ -23,7 +23,7 @@ jobs:
       artifact-name: "webapp-build"
     secrets: 
       swa-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AGREEABLE_DUNE_08FACD403 }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      gh-token: ${{ secrets.GITHUB_TOKEN }}
     if: |
       (github.event_name == 'push' 
       || (github.event_name == 'pull_request' && github.event.action != 'closed'))
