@@ -41,7 +41,7 @@ jobs:
       || (github.event_name == 'pull_request' && github.event.action != 'closed'))
        && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
-    depends-on: ["build"]
+    needs: ["build"]
     name: Deploy WebApp
     steps:
       - uses: actions/download-artifact@v2
