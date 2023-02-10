@@ -11,11 +11,10 @@ jobs:
     with:
       artifact-name: "webapp-build"
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
-  
 
   deploy:
     needs: ["build"]
-    uses: ./.github/workflows/build.yml
+    uses: ./.github/workflows/deploy.yml
     with:
       artifact-name: "webapp-build"
     secrets:
