@@ -1,0 +1,5 @@
+[*.toml]
+end_of_line = lf
+
+[*.rs]
+end_of_line = lf
