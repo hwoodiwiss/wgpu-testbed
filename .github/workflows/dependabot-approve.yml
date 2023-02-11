@@ -7,7 +7,6 @@ on:
 jobs:
   dependabot:
     name: "Dependabot"
-    needs: [build]
     runs-on: ubuntu-latest
     if: ${{ github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'}} # Detect that the PR author is dependabot
     steps:
