@@ -28,7 +28,7 @@ jobs:
          cd wgpu-testbed-webapp
          yarn install
          yarn build
-     - uses: actions/upload-artifact@v2
+     - uses: actions/upload-artifact@v3
        with:
          name: ${{ inputs.artifact-name }}
          path: wgpu-testbed-webapp/dist
