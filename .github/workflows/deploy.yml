@@ -11,7 +11,6 @@ on:
       gh-token:
         required: true
 
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -29,3 +28,15 @@ jobs:
           action: "upload"
           app_location: "."
           skip_app_build: true
+
+  close:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Close Pull Request Job
+    steps:
+      - name: Close Pull Request
+        id: closepullrequest
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.swa-api-token }}
+          action: "close"
