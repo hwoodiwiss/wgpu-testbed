@@ -8,17 +8,22 @@ module.exports = {
     filename: "bootstrap.js",
   },
   mode: "development",
+  experiments: {
+    asyncWebAssembly: true,
+  },
   plugins: [
-    new CopyWebpackPlugin([
-      "index.html",
-      {
-        from: "../resources",
-        to: "resources",
-      },
-      {
-        from: "../shaders",
-        to: "shaders",
-      },
-    ]),
+    new CopyWebpackPlugin({
+      patterns: [
+        "index.html",
+        {
+          from: "../resources",
+          to: "resources",
+        },
+        {
+          from: "../shaders",
+          to: "shaders",
+        },
+      ],
+    }),
   ],
 };
