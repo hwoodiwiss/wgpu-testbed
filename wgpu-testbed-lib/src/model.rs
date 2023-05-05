@@ -259,22 +259,29 @@ impl ModelLoader {
 
         for mat in obj_materials {
             let diffuse_path = &mat.diffuse_texture;
+            let diffuse_path = diffuse_path
+                .clone()
+                .expect("Material has no diffuse texture");
             let diffuse_texture = Texture::load(
                 device,
                 queue,
-                resource_base.join(diffuse_path).to_str().expect(
-                    ("Could not convert diffuse path to &str: ".to_owned() + diffuse_path).as_str(),
+                resource_base.join(diffuse_path.clone()).to_str().expect(
+                    ("Could not convert diffuse path to &str: ".to_owned() + &diffuse_path)
+                        .as_str(),
                 ),
                 false,
             )
             .await?;
 
             let normal_path = &mat.normal_texture;
+            let normal_path = normal_path
+                .clone()
+                .expect("Material has no normal texture!");
             let normal_texture = Texture::load(
                 device,
                 queue,
-                resource_base.join(normal_path).to_str().expect(
-                    ("Could not convert normal path to &str: ".to_owned() + normal_path).as_str(),
+                resource_base.join(normal_path.clone()).to_str().expect(
+                    ("Could not convert normal path to &str: ".to_owned() + &normal_path).as_str(),
                 ),
                 true,
             )
