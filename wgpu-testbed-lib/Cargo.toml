@@ -21,7 +21,7 @@ tobj = { version = "4.0.0", features = ["async"]}
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
 js-sys = "0.3.51"
-web-sys = { version = "0.3.51", features = ["Response"] }
+web-sys = { version = "0.3.62", features = ["Response"] }
 console_error_panic_hook = "0.1.6"
 wasm-bindgen-futures = "0.4.26"
 # Fixes getrandom, used by tobj, requiring the js feature for wasm32-unkown-unknown targets
