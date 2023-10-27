@@ -16,15 +16,15 @@ jobs:
       artifact-name: "webapp-build"
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
 
-  deploy:
-    needs: [build]
-    uses: ./.github/workflows/deploy.yml
-    with:
-      artifact-name: "webapp-build"
-    secrets:
-      swa-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AGREEABLE_DUNE_08FACD403 }}
-      gh-token: ${{ secrets.GITHUB_TOKEN }}
-    if: |
-      (github.event_name == 'push' 
-      || (github.event_name == 'pull_request' && github.event.action != 'closed'))
-       && github.actor != 'dependabot[bot]'
+  # deploy:
+  #   needs: [build]
+  #   uses: ./.github/workflows/deploy.yml
+  #   with:
+  #     artifact-name: "webapp-build"
+  #   secrets:
+  #     swa-api-token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AGREEABLE_DUNE_08FACD403 }}
+  #     gh-token: ${{ secrets.GITHUB_TOKEN }}
+  #   if: |
+  #     (github.event_name == 'push' 
+  #     || (github.event_name == 'pull_request' && github.event.action != 'closed'))
+  #      && github.actor != 'dependabot[bot]'
