@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::iter::FromIterator;
+use std::sync::Arc;
 
 use crate::camera::CameraController;
 use crate::file_reader::FileReader;
@@ -10,7 +11,7 @@ use crate::{instance::Instance, light::Light};
 use cgmath::*;
 
 use wgpu::util::DeviceExt;
-use wgpu::{InstanceDescriptor, PowerPreference, SamplerBindingType};
+use wgpu::{InstanceDescriptor, PowerPreference, SamplerBindingType, SurfaceTarget, WindowHandle};
 use winit::{event::WindowEvent, window::Window};
 
 use crate::camera::Camera;
@@ -37,8 +38,8 @@ const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
 );
 
 const RENDER_SCALE: f32 = 2.0;
-pub struct State {
-    surface: wgpu::Surface,
+pub struct State<'a> {
+    surface: wgpu::Surface<'a>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
@@ -63,16 +64,15 @@ pub struct State {
     output_render_pipeline: wgpu::RenderPipeline,
 }
 
-impl State {
-    pub async fn new(window: &Window) -> Self {
+impl<'a> State<'_> {
+    pub async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
         let instance_desc = InstanceDescriptor::default();
         let instance = wgpu::Instance::new(instance_desc);
-        let surface = unsafe {
-            instance
-                .create_surface(window)
-                .expect("Expected surface from window")
-        };
+        let surface = instance
+            .create_surface(window.clone())
+            .expect("Expected surface from window");
+
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 compatible_surface: Some(&surface),
@@ -85,9 +85,9 @@ impl State {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
                     label: None,
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
                 },
                 None,
             )
@@ -102,6 +102,7 @@ impl State {
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![wgpu::TextureFormat::Bgra8UnormSrgb],
+            desired_maximum_frame_latency: 1,
         };
 
         surface.configure(&device, &surface_config);
