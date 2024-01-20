@@ -11,7 +11,7 @@ use crate::{instance::Instance, light::Light};
 use cgmath::*;
 
 use wgpu::util::DeviceExt;
-use wgpu::{InstanceDescriptor, PowerPreference, SamplerBindingType, SurfaceTarget, WindowHandle};
+use wgpu::{InstanceDescriptor, PowerPreference, SamplerBindingType};
 use winit::{event::WindowEvent, window::Window};
 
 use crate::camera::Camera;

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use winit::{
     dpi::PhysicalSize,
     event::*,
-    event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
+    event_loop::EventLoop,
     keyboard::{Key, NamedKey},
     window::WindowBuilder,
 };
@@ -51,10 +51,12 @@ pub async fn run() {
     {
         use winit::platform::web::WindowExtWebSys;
 
-        let canvas = window.canvas();
+        let canvas = window.canvas().expect("Could not get canvas reference");
 
-        let window = web_sys::window().expect("Could not get window reference");
-        let document = window.document().expect("Could not get document reference");
+        let web_window = web_sys::window().expect("Could not get window reference");
+        let document = web_window
+            .document()
+            .expect("Could not get document reference");
         let body = document.body().expect("Could not get body reference");
 
         body.append_child(&canvas)
