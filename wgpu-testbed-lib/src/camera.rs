@@ -1,4 +1,7 @@
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::{
+    event::{ElementState, WindowEvent},
+    keyboard::{Key, NamedKey},
+};
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -53,40 +56,36 @@ impl CameraController {
 
     pub fn process_inputs(&mut self, event: &WindowEvent) -> bool {
         match event {
-            WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
-                        state,
-                        virtual_keycode: Some(keycode),
-                        ..
+            WindowEvent::KeyboardInput { event, .. } => {
+                let is_pressed = event.state == ElementState::Pressed;
+                match &event.logical_key {
+                    Key::Named(name) => match name {
+                        NamedKey::Space => {
+                            self.up_pressed = is_pressed;
+                            true
+                        }
+                        NamedKey::Control => {
+                            self.down_pressed = is_pressed;
+                            true
+                        }
+                        _ => false,
                     },
-                ..
-            } => {
-                let is_pressed = *state == ElementState::Pressed;
-                match keycode {
-                    VirtualKeyCode::Space => {
-                        self.up_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::LControl => {
-                        self.down_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::W | VirtualKeyCode::Up => {
-                        self.forward_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::S | VirtualKeyCode::Down => {
-                        self.backward_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::A | VirtualKeyCode::Left => {
-                        self.left_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::D | VirtualKeyCode::Right => {
-                        self.right_pressed = is_pressed;
-                        true
+                    Key::Character(character) => {
+                        if character == "w" {
+                            self.forward_pressed = is_pressed;
+                            true
+                        } else if character == "s" {
+                            self.backward_pressed = is_pressed;
+                            true
+                        } else if character == "a" {
+                            self.left_pressed = is_pressed;
+                            true
+                        } else if character == "d" {
+                            self.right_pressed = is_pressed;
+                            true
+                        } else {
+                            false
+                        }
                     }
                     _ => false,
                 }

@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use winit::{
     dpi::PhysicalSize,
     event::*,
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
+    keyboard::{Key, NamedKey},
     window::WindowBuilder,
 };
 
@@ -33,64 +36,71 @@ pub async fn run_wasm() {
 pub async fn run() {
     env_logger::init();
 
-    let evt_loop = EventLoop::new();
+    let evt_loop = EventLoop::new().expect("Failed to create event loop!");
 
     let window_size = PhysicalSize::new(1920, 1080);
-    let window = WindowBuilder::new()
-        .with_title("WGPU Rendering")
-        .with_inner_size(window_size)
-        .build(&evt_loop)
-        .expect("Failed to create window!");
+    let window = Arc::new(
+        WindowBuilder::new()
+            .with_title("WGPU Rendering")
+            .with_inner_size(window_size)
+            .build(&evt_loop)
+            .expect("Failed to create window!"),
+    );
 
     #[cfg(target_arch = "wasm32")]
     {
         use winit::platform::web::WindowExtWebSys;
 
-        let canvas = window.canvas();
+        let canvas = window.canvas().expect("Could not get canvas reference");
 
-        let window = web_sys::window().expect("Could not get window reference");
-        let document = window.document().expect("Could not get document reference");
+        let web_window = web_sys::window().expect("Could not get window reference");
+        let document = web_window
+            .document()
+            .expect("Could not get document reference");
         let body = document.body().expect("Could not get body reference");
 
         body.append_child(&canvas)
             .expect("Append canvas to HTML body");
     }
 
-    let mut render_state = State::new(&window).await;
-    evt_loop.run(move |event, _, control_flow| match event {
-        Event::WindowEvent {
-            ref event,
-            window_id,
-        } if window_id == window.id() && !render_state.input(event) => match event {
-            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-            WindowEvent::Resized(new_size) => render_state.resize(*new_size),
-            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                render_state.resize(**new_inner_size)
-            }
-            WindowEvent::KeyboardInput { input, .. } => match input {
-                KeyboardInput {
-                    state: ElementState::Pressed,
-                    virtual_keycode: Some(VirtualKeyCode::Escape),
-                    ..
-                } => *control_flow = ControlFlow::Exit,
+    let mut render_state = State::new(window.clone()).await;
+    evt_loop
+        .run(move |event, target| match event {
+            Event::WindowEvent {
+                ref event,
+                window_id,
+            } if window_id == window.id() && !render_state.input(event) => match event {
+                WindowEvent::CloseRequested => target.exit(),
+                WindowEvent::Resized(new_size) => render_state.resize(*new_size),
+                WindowEvent::ScaleFactorChanged {
+                    scale_factor: _,
+                    inner_size_writer: _,
+                } => render_state.resize(window.inner_size()),
+                WindowEvent::KeyboardInput { event, .. }
+                    if event.state == ElementState::Pressed =>
+                {
+                    match event.logical_key {
+                        Key::Named(key) => match key {
+                            NamedKey::Escape => target.exit(),
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+                }
+                WindowEvent::RedrawRequested => {
+                    render_state.update();
+                    match render_state.render() {
+                        Ok(_) => {}
+                        //On swapchain lost, recreate
+                        Err(wgpu::SurfaceError::Lost) => render_state.resize(render_state.size),
+                        // On OOM Exit
+                        Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
+                        Err(e) => eprintln!("{:?}", e),
+                    }
+                }
                 _ => {}
             },
             _ => {}
-        },
-        Event::RedrawRequested(_) => {
-            render_state.update();
-            match render_state.render() {
-                Ok(_) => {}
-                //On swapchain lost, recreate
-                Err(wgpu::SurfaceError::Lost) => render_state.resize(render_state.size),
-                // On OOM Exit
-                Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                Err(e) => eprintln!("{:?}", e),
-            }
-        }
-        Event::MainEventsCleared => {
-            window.request_redraw();
-        }
-        _ => {}
-    });
+        })
+        .expect("Failed to run event loop!");
 }
