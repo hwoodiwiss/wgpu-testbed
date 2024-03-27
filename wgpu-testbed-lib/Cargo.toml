@@ -20,7 +20,7 @@ futures = "0.3"
 wgpu = "0.19.3"
 bytemuck = { version = "1.15.0", features = ["derive"] }
 anyhow = "1.0"
-tobj = { version = "4.0.1", features = ["async"] }
+tobj = { version = "4.0.2", features = ["async"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
