@@ -53,11 +53,17 @@ pub fn create_render_pipeline(
             module: &shader,
             entry_point: "vertex_main",
             buffers: vertex_layouts,
+            compilation_options: wgpu::PipelineCompilationOptions {
+                ..Default::default()
+            },
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
             entry_point: "fragment_main",
             targets: targets,
+            compilation_options: wgpu::PipelineCompilationOptions {
+                ..Default::default()
+            },
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
@@ -117,5 +123,8 @@ pub fn create_compute_pipeline(
         layout: Some(&layout),
         module: &shader,
         entry_point: "main",
+        compilation_options: wgpu::PipelineCompilationOptions {
+            ..Default::default()
+        },
     })
 }
