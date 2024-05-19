@@ -151,9 +151,9 @@ impl<'a> State<'_> {
             target: (0.0, 0.0, 0.0).into(),
             up: (0.0, 1.0, 0.0).into(),
             aspect: surface_config.width as f32 / surface_config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 1000.0,
+            fov_y: 45.0,
+            z_near: 0.1,
+            z_far: 1000.0,
         };
 
         let camera_controller = CameraController::new(0.2);

@@ -76,16 +76,18 @@ pub async fn run() {
                     scale_factor: _,
                     inner_size_writer: _,
                 } => render_state.resize(window.inner_size()),
-                WindowEvent::KeyboardInput { event, .. }
-                    if event.state == ElementState::Pressed =>
-                {
-                    match event.logical_key {
+                WindowEvent::KeyboardInput {
+                    event: key_event, ..
+                } if key_event.state == ElementState::Pressed => {
+                    match key_event.logical_key {
                         Key::Named(key) => match key {
                             NamedKey::Escape => target.exit(),
                             _ => {}
                         },
                         _ => {}
                     }
+
+                    render_state.input(event);
                 }
                 WindowEvent::RedrawRequested => {
                     render_state.update();
@@ -100,6 +102,7 @@ pub async fn run() {
                 }
                 _ => {}
             },
+            Event::AboutToWait { .. } => window.request_redraw(),
             _ => {}
         })
         .expect("Failed to run event loop!");
