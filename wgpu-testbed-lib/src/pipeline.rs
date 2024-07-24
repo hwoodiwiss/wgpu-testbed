@@ -101,6 +101,7 @@ pub fn create_render_pipeline(
             mask: !0,
             alpha_to_coverage_enabled: false,
         },
+        cache: None,
     });
 }
 
@@ -126,5 +127,6 @@ pub fn create_compute_pipeline(
         compilation_options: wgpu::PipelineCompilationOptions {
             ..Default::default()
         },
+        cache: None,
     })
 }
