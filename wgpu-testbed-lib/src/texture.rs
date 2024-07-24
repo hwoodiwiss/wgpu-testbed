@@ -4,6 +4,7 @@ use image::GenericImageView;
 use crate::file_reader::FileReader;
 
 pub struct Texture {
+    #[allow(dead_code)]
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,

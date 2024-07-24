@@ -79,12 +79,10 @@ pub async fn run() {
                 WindowEvent::KeyboardInput {
                     event: key_event, ..
                 } if key_event.state == ElementState::Pressed => {
-                    match key_event.logical_key {
-                        Key::Named(key) => match key {
-                            NamedKey::Escape => target.exit(),
-                            _ => {}
-                        },
-                        _ => {}
+                    if let Key::Named(key) = key_event.logical_key {
+                        if key == NamedKey::Escape {
+                            target.exit()
+                        }
                     }
 
                     render_state.input(event);

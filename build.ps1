@@ -1,4 +1,4 @@
-cargo clippy
+cargo clippy -- -D warnings
 cargo build --release
 
 Push-Location ".\wgpu-testbed-lib"
