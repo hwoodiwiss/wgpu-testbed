@@ -58,9 +58,32 @@ pub async fn run() {
             .document()
             .expect("Could not get document reference");
         let body = document.body().expect("Could not get body reference");
+        web_sys::console::log_1(
+            &format!(
+                "Web Window Width: {}, Height: {}",
+                web_window.inner_width().unwrap().as_f64().unwrap(),
+                web_window.inner_height().unwrap().as_f64().unwrap()
+            )
+            .as_str()
+            .into(),
+        );
 
         body.append_child(&canvas)
             .expect("Append canvas to HTML body");
+
+        canvas
+            .set_attribute("style", "width: 100%; aspect-ratio: 16/9;")
+            .expect("Set canvas style");
+
+        web_sys::console::log_1(
+            &format!(
+                "Canvas Window Width: {}, Height: {}",
+                canvas.width(),
+                canvas.height()
+            )
+            .as_str()
+            .into(),
+        );
     }
 
     let mut render_state = State::new(window.clone()).await;
@@ -71,7 +94,21 @@ pub async fn run() {
                 window_id,
             } if window_id == window.id() && !render_state.input(event) => match event {
                 WindowEvent::CloseRequested => target.exit(),
-                WindowEvent::Resized(new_size) => render_state.resize(*new_size),
+                WindowEvent::Resized(new_size) => {
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        use winit::platform::web::WindowExtWebSys;
+
+                        if (new_size.width > 0 && new_size.height > 0) {
+                            let canvas = window.canvas().expect("Could not get canvas reference");
+                            canvas
+                                .set_attribute("style", "width: 100%; aspect-ratio: auto;")
+                                .expect("Set canvas style");
+                        }
+                    }
+
+                    render_state.resize(*new_size)
+                }
                 WindowEvent::ScaleFactorChanged {
                     scale_factor: _,
                     inner_size_writer: _,
