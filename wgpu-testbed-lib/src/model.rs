@@ -265,10 +265,7 @@ impl ModelLoader {
             let diffuse_texture = Texture::load(
                 device,
                 queue,
-                resource_base.join(diffuse_path.clone()).to_str().expect(
-                    ("Could not convert diffuse path to &str: ".to_owned() + &diffuse_path)
-                        .as_str(),
-                ),
+                resource_base.join(diffuse_path.clone()).to_str().unwrap_or_else(|| { panic!("{}", ("Could not convert diffuse path to &str: ".to_owned() + &diffuse_path)) }),
                 false,
             )
             .await?;
@@ -280,9 +277,7 @@ impl ModelLoader {
             let normal_texture = Texture::load(
                 device,
                 queue,
-                resource_base.join(normal_path.clone()).to_str().expect(
-                    ("Could not convert normal path to &str: ".to_owned() + &normal_path).as_str(),
-                ),
+                resource_base.join(normal_path.clone()).to_str().unwrap_or_else(|| { panic!("{}", ("Could not convert normal path to &str: ".to_owned() + &normal_path)) }),
                 true,
             )
             .await?;
@@ -507,8 +502,8 @@ where
         self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
         self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         self.set_bind_group(0, &material.bind_group, &[]);
-        self.set_bind_group(1, &uniforms, &[]);
-        self.set_bind_group(2, &light, &[]);
+        self.set_bind_group(1, uniforms, &[]);
+        self.set_bind_group(2, light, &[]);
         self.draw_mesh_instanced(mesh, material, 0..1, uniforms, light);
     }
 
@@ -523,8 +518,8 @@ where
         self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
         self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         self.set_bind_group(0, &material.bind_group, &[]);
-        self.set_bind_group(1, &uniforms, &[]);
-        self.set_bind_group(2, &light, &[]);
+        self.set_bind_group(1, uniforms, &[]);
+        self.set_bind_group(2, light, &[]);
         self.draw_indexed(0..mesh.num_elements, 0, instances);
     }
 

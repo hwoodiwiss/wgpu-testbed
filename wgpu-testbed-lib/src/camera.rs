@@ -32,7 +32,7 @@ impl Camera {
             self.z_far,
         );
 
-        return OPENGL_TO_WGPU_MATRIX * proj * view;
+        OPENGL_TO_WGPU_MATRIX * proj * view
     }
 }
 
@@ -127,11 +127,11 @@ impl CameraController {
         }
 
         if self.up_pressed {
-            camera.eye = camera.eye + camera.up * self.speed;
+            camera.eye += camera.up * self.speed;
         }
 
         if self.down_pressed {
-            camera.eye = camera.eye - camera.up * self.speed;
+            camera.eye -= camera.up * self.speed;
         }
     }
 }
