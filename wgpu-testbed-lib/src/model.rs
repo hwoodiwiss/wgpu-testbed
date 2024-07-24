@@ -86,12 +86,14 @@ impl Vertex for ModelVertex {
 }
 
 pub struct Material {
+    #[allow(dead_code)]
     pub name: String,
     pub textures: HashMap<String, Texture>,
     pub bind_group: wgpu::BindGroup,
 }
 
 pub struct Mesh {
+    #[allow(dead_code)]
     pub name: String,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
@@ -265,7 +267,15 @@ impl ModelLoader {
             let diffuse_texture = Texture::load(
                 device,
                 queue,
-                resource_base.join(diffuse_path.clone()).to_str().unwrap_or_else(|| { panic!("{}", ("Could not convert diffuse path to &str: ".to_owned() + &diffuse_path)) }),
+                resource_base
+                    .join(diffuse_path.clone())
+                    .to_str()
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "{}",
+                            ("Could not convert diffuse path to &str: ".to_owned() + &diffuse_path)
+                        )
+                    }),
                 false,
             )
             .await?;
@@ -277,7 +287,15 @@ impl ModelLoader {
             let normal_texture = Texture::load(
                 device,
                 queue,
-                resource_base.join(normal_path.clone()).to_str().unwrap_or_else(|| { panic!("{}", ("Could not convert normal path to &str: ".to_owned() + &normal_path)) }),
+                resource_base
+                    .join(normal_path.clone())
+                    .to_str()
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "{}",
+                            ("Could not convert normal path to &str: ".to_owned() + &normal_path)
+                        )
+                    }),
                 true,
             )
             .await?;
@@ -457,6 +475,7 @@ pub trait DrawModel<'a, 'b>
 where
     'b: 'a,
 {
+    #[allow(dead_code)]
     fn draw_mesh(
         &mut self,
         mesh: &'b Mesh,
@@ -473,6 +492,7 @@ where
         light: &'b wgpu::BindGroup,
     );
 
+    #[allow(dead_code)]
     fn draw_model(
         &mut self,
         model: &'b Model,
@@ -550,6 +570,7 @@ pub trait DrawLight<'a, 'b>
 where
     'b: 'a,
 {
+    #[allow(dead_code)]
     fn draw_light_mesh(
         &mut self,
         mesh: &'b Mesh,
