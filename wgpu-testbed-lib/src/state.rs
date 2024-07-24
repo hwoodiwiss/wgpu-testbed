@@ -263,9 +263,9 @@ impl<'a> State<'_> {
                     let z = SPACE_BETWEEN * (z as f32 - INSTANCES_PER_ROW as f32 / 2.0);
 
                     let position = cgmath::Vector3 {
-                        x: x as f32,
+                        x,
                         y: 0.0,
-                        z: z as f32,
+                        z,
                     } - INSTANCE_DISPLACEMENT;
 
                     let rotation = if position.is_zero() {
@@ -275,7 +275,7 @@ impl<'a> State<'_> {
                         )
                     } else {
                         cgmath::Quaternion::from_axis_angle(
-                            position.clone().normalize(),
+                            position.normalize(),
                             cgmath::Deg(45.0),
                         )
                     };
