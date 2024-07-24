@@ -26,5 +26,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.artifact-name }}
+          name: publish-wasm-site
           path: wgpu-testbed-webapp/dist
