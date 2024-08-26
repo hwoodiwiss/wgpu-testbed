@@ -3,7 +3,6 @@
 #Requires -PSEdition Core
 
 cargo clippy -- -D warnings
-cargo build --release
 
 Push-Location ".\wgpu-testbed-lib"
 $env:RUSTFLAGS = "--cfg=web_sys_unstable_apis"
