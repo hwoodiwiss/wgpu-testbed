@@ -58,15 +58,6 @@ pub async fn run() {
             .document()
             .expect("Could not get document reference");
         let body = document.body().expect("Could not get body reference");
-        web_sys::console::log_1(
-            &format!(
-                "Web Window Width: {}, Height: {}",
-                web_window.inner_width().unwrap().as_f64().unwrap(),
-                web_window.inner_height().unwrap().as_f64().unwrap()
-            )
-            .as_str()
-            .into(),
-        );
 
         body.append_child(&canvas)
             .expect("Append canvas to HTML body");
@@ -74,16 +65,6 @@ pub async fn run() {
         canvas
             .set_attribute("style", "width: 100%; aspect-ratio: 16/9;")
             .expect("Set canvas style");
-
-        web_sys::console::log_1(
-            &format!(
-                "Canvas Window Width: {}, Height: {}",
-                canvas.width(),
-                canvas.height()
-            )
-            .as_str()
-            .into(),
-        );
     }
 
     let mut render_state = State::new(window.clone()).await;

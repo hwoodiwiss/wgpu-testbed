@@ -12,6 +12,6 @@ Pop-Location
 Push-Location ".\wgpu-testbed-webapp"
 Remove-Item "./node_modules" -Recurse -ErrorAction SilentlyContinue
 Remove-Item "./dist" -Recurse -ErrorAction SilentlyContinue
-yarn install
-yarn build
+npm i
+npm run build
 Pop-Location
