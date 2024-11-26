@@ -4,6 +4,7 @@ use image::GenericImageView;
 use crate::file_reader::FileReader;
 
 pub struct Texture {
+    #[allow(dead_code)]
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
@@ -32,7 +33,7 @@ impl Texture {
             dimension: wgpu::TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &vec![Self::DEPTH_FORMAT],
+            view_formats: &[Self::DEPTH_FORMAT],
         };
 
         let texture = device.create_texture(&desc);
@@ -80,7 +81,7 @@ impl Texture {
             dimension: wgpu::TextureDimension::D2,
             format: surface_config.format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &vec![surface_config.format],
+            view_formats: &[surface_config.format],
         };
 
         let texture = device.create_texture(&desc);
@@ -162,7 +163,7 @@ impl Texture {
                 wgpu::TextureFormat::Rgba8UnormSrgb
             },
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &vec![wgpu::TextureFormat::Rgba8UnormSrgb],
+            view_formats: &[wgpu::TextureFormat::Rgba8UnormSrgb],
         });
 
         queue.write_texture(

@@ -45,7 +45,7 @@ pub fn create_render_pipeline(
 ) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(shader);
 
-    return device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label,
         layout: Some(layout),
         multiview: None,
@@ -60,7 +60,7 @@ pub fn create_render_pipeline(
         fragment: Some(wgpu::FragmentState {
             module: &shader,
             entry_point: "fragment_main",
-            targets: targets,
+            targets,
             compilation_options: wgpu::PipelineCompilationOptions {
                 ..Default::default()
             },
@@ -102,7 +102,7 @@ pub fn create_render_pipeline(
             alpha_to_coverage_enabled: false,
         },
         cache: None,
-    });
+    })
 }
 
 pub fn create_compute_pipeline(

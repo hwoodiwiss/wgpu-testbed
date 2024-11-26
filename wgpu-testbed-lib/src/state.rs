@@ -67,6 +67,19 @@ pub struct State<'a> {
 impl<'a> State<'_> {
     pub async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            web_sys::console::log_1(
+                &format!(
+                    "Window Inner Size Window Width: {}, Height: {}",
+                    size.width, size.height
+                )
+                .as_str()
+                .into(),
+            );
+        }
+
         let instance_desc = InstanceDescriptor::default();
         let instance = wgpu::Instance::new(instance_desc);
         let surface = instance
@@ -94,6 +107,7 @@ impl<'a> State<'_> {
             )
             .await
             .expect("Could not get device from adapter!");
+
         let capabilities = surface.get_capabilities(&adapter);
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -262,11 +276,7 @@ impl<'a> State<'_> {
                     let x = SPACE_BETWEEN * (x as f32 - INSTANCES_PER_ROW as f32 / 2.0);
                     let z = SPACE_BETWEEN * (z as f32 - INSTANCES_PER_ROW as f32 / 2.0);
 
-                    let position = cgmath::Vector3 {
-                        x: x as f32,
-                        y: 0.0,
-                        z: z as f32,
-                    } - INSTANCE_DISPLACEMENT;
+                    let position = cgmath::Vector3 { x, y: 0.0, z } - INSTANCE_DISPLACEMENT;
 
                     let rotation = if position.is_zero() {
                         cgmath::Quaternion::from_axis_angle(
@@ -274,10 +284,7 @@ impl<'a> State<'_> {
                             cgmath::Deg(0.0),
                         )
                     } else {
-                        cgmath::Quaternion::from_axis_angle(
-                            position.clone().normalize(),
-                            cgmath::Deg(45.0),
-                        )
+                        cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
                     };
 
                     Instance { position, rotation }

@@ -61,6 +61,10 @@ pub async fn run() {
 
         body.append_child(&canvas)
             .expect("Append canvas to HTML body");
+
+        canvas
+            .set_attribute("style", "width: 100%; aspect-ratio: 16/9;")
+            .expect("Set canvas style");
     }
 
     let mut render_state = State::new(window.clone()).await;
@@ -71,7 +75,21 @@ pub async fn run() {
                 window_id,
             } if window_id == window.id() && !render_state.input(event) => match event {
                 WindowEvent::CloseRequested => target.exit(),
-                WindowEvent::Resized(new_size) => render_state.resize(*new_size),
+                WindowEvent::Resized(new_size) => {
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        use winit::platform::web::WindowExtWebSys;
+
+                        if (new_size.width > 0 && new_size.height > 0) {
+                            let canvas = window.canvas().expect("Could not get canvas reference");
+                            canvas
+                                .set_attribute("style", "width: 100%; aspect-ratio: auto;")
+                                .expect("Set canvas style");
+                        }
+                    }
+
+                    render_state.resize(*new_size)
+                }
                 WindowEvent::ScaleFactorChanged {
                     scale_factor: _,
                     inner_size_writer: _,
@@ -79,12 +97,10 @@ pub async fn run() {
                 WindowEvent::KeyboardInput {
                     event: key_event, ..
                 } if key_event.state == ElementState::Pressed => {
-                    match key_event.logical_key {
-                        Key::Named(key) => match key {
-                            NamedKey::Escape => target.exit(),
-                            _ => {}
-                        },
-                        _ => {}
+                    if let Key::Named(key) = key_event.logical_key {
+                        if key == NamedKey::Escape {
+                            target.exit()
+                        }
                     }
 
                     render_state.input(event);
