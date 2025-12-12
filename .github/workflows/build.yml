@@ -26,7 +26,7 @@ jobs:
         run: ./build.ps1
         shell: pwsh
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: publish-wasm-site
           path: wgpu-testbed-webapp/dist
