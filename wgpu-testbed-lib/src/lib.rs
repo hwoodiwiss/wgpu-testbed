@@ -80,7 +80,7 @@ pub async fn run() {
                     {
                         use winit::platform::web::WindowExtWebSys;
 
-                        if (new_size.width > 0 && new_size.height > 0) {
+                        if new_size.width > 0 && new_size.height > 0 {
                             let canvas = window.canvas().expect("Could not get canvas reference");
                             canvas
                                 .set_attribute("style", "width: 100%; aspect-ratio: auto;")
@@ -118,7 +118,7 @@ pub async fn run() {
                 }
                 _ => {}
             },
-            Event::AboutToWait { .. } => window.request_redraw(),
+            Event::AboutToWait => window.request_redraw(),
             _ => {}
         })
         .expect("Failed to run event loop!");

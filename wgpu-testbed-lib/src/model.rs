@@ -162,7 +162,7 @@ impl pipeline::Bindable for BitangentComputeBinding {
         ]
     }
 
-    fn bind_group_entries(&self) -> Vec<wgpu::BindGroupEntry> {
+    fn bind_group_entries(&self) -> Vec<wgpu::BindGroupEntry<'_>> {
         vec![
             //Src Verts
             wgpu::BindGroupEntry {
@@ -233,24 +233,21 @@ impl ModelLoader {
         let obj_data =
             FileReader::read_file(path.to_str().expect("Could not convert model path to &str"))
                 .await;
-        let (obj_models, obj_materials) = tobj::load_obj_buf_async(
+        let (obj_models, obj_materials) = tobj::futures::load_obj_buf(
             &mut obj_data.as_slice(),
             &tobj::LoadOptions {
                 triangulate: true,
                 single_index: true,
                 ..Default::default()
             },
-            |path| {
-                Box::pin(async move {
-                    let mtl_data = FileReader::read_file(
-                        resource_base
-                            .join(path)
-                            .to_str()
-                            .expect("Could not convert material path to &str"),
-                    )
-                    .await;
-                    tobj::load_mtl_buf(&mut mtl_data.as_slice())
-                })
+            async |path| {
+                let mtl_data = FileReader::read_file(
+                    resource_base
+                        .join(path)
+                        .to_str()
+                        .expect("Could not convert material path to &str"),
+                ).await;
+                tobj::load_mtl_buf(&mut mtl_data.as_slice())
             },
         )
         .await?;

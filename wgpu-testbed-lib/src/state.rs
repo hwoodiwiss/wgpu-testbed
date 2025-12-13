@@ -64,7 +64,7 @@ pub struct State<'a> {
     output_render_pipeline: wgpu::RenderPipeline,
 }
 
-impl<'a> State<'_> {
+impl<'a> State<'a> {
     pub async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
 
