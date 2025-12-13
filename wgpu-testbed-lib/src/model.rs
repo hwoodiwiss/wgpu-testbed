@@ -410,7 +410,9 @@ impl ModelLoader {
                 pass.dispatch_workgroups(binding.compute_info.num_vertices, 1, 1);
             }
             queue.submit(std::iter::once(encoder.finish()));
-            device.poll(wgpu::Maintain::Wait);
+            if let Err(e) = device.poll(wgpu::PollType::Poll) {
+                return Err(anyhow!("Error during compute bitangent calculation: {:?}", e));
+            }
 
             meshes.push(Mesh {
                 name: model.name,

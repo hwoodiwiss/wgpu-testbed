@@ -51,7 +51,7 @@ pub fn create_render_pipeline(
         multiview: None,
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: "vertex_main",
+            entry_point: Some(&"vertex_main"),
             buffers: vertex_layouts,
             compilation_options: wgpu::PipelineCompilationOptions {
                 ..Default::default()
@@ -59,7 +59,7 @@ pub fn create_render_pipeline(
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: "fragment_main",
+            entry_point: Some(&"fragment_main"),
             targets,
             compilation_options: wgpu::PipelineCompilationOptions {
                 ..Default::default()
@@ -123,7 +123,7 @@ pub fn create_compute_pipeline(
         label,
         layout: Some(&layout),
         module: &shader,
-        entry_point: "main",
+        entry_point: Some(&"main"),
         compilation_options: wgpu::PipelineCompilationOptions {
             ..Default::default()
         },

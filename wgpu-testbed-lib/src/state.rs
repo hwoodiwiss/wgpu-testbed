@@ -10,8 +10,9 @@ use crate::uniform::Uniforms;
 use crate::{instance::Instance, light::Light};
 use cgmath::*;
 
+use log::info;
 use wgpu::util::DeviceExt;
-use wgpu::{InstanceDescriptor, PowerPreference, SamplerBindingType};
+use wgpu::{ExperimentalFeatures, InstanceDescriptor, PowerPreference, SamplerBindingType};
 use winit::{event::WindowEvent, window::Window};
 
 use crate::camera::Camera;
@@ -20,8 +21,7 @@ use crate::model::{DrawModel, Model};
 use crate::texture::{self, Texture};
 use crate::vertex::Vertex;
 
-fn rgb_to_normalized(r: u8, g: u8, b: u8) -> wgpu::Color {
-    // Wish this could be const, but cant do fp arithmetic in const fn
+const fn rgb_to_normalized(r: u8, g: u8, b: u8) -> wgpu::Color {
     wgpu::Color {
         r: r as f64 / 255f64,
         g: g as f64 / 255f64,
@@ -80,8 +80,18 @@ impl<'a> State<'a> {
             );
         }
 
-        let instance_desc = InstanceDescriptor::default();
-        let instance = wgpu::Instance::new(instance_desc);
+        // This is possibly specific to my WoA laptop, the Vulkan driver seems to be broken, so I'm seeing access violations.
+        let supported_backends = if cfg!(all(target_arch = "aarch64", target_os = "windows")) { 
+            wgpu::Backends::DX12 
+        } else {
+            wgpu::Backends::all()
+        };
+
+        let instance_desc = InstanceDescriptor {
+            backends: supported_backends,
+            ..Default::default()
+        };
+        let instance = wgpu::Instance::new(&instance_desc);
         let surface = instance
             .create_surface(window.clone())
             .expect("Expected surface from window");
@@ -102,26 +112,39 @@ impl<'a> State<'a> {
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::default(),
                     memory_hints: wgpu::MemoryHints::Performance,
+                    experimental_features: ExperimentalFeatures::disabled(),
+                    trace: wgpu::Trace::Off,
                 },
-                None,
             )
             .await
             .expect("Could not get device from adapter!");
 
+        info!("Adapter info: {:?}", adapter.get_info());
+        info!("Device info: {:?}", device);
+
+        info!("Supported surface formats:");
         let capabilities = surface.get_capabilities(&adapter);
+        capabilities.formats.iter().for_each(|f| {
+            info!("Surface format: {:?}", f);
+        });
+
+        let surface_format = capabilities.formats[0];
+        info!("Selected surface format: {:?}", surface_format);        
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: capabilities.formats[0],
+            format: surface_format,
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
-            view_formats: vec![wgpu::TextureFormat::Bgra8UnormSrgb],
+            view_formats: vec![surface_format],
             desired_maximum_frame_latency: 1,
         };
 
+        info!("About to configure surface: {:?}", surface_config);
         surface.configure(&device, &surface_config);
 
+        info!("Surface configured: {:?}", surface_config);
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Texture bind group layout"),
@@ -294,6 +317,7 @@ impl<'a> State<'a> {
 
         let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
 
+        info!("Creating instance buffer");
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
             contents: bytemuck::cast_slice(instance_data.as_slice()),
@@ -306,6 +330,7 @@ impl<'a> State<'a> {
         let shader_str =
             std::str::from_utf8(shader_buffer.as_slice()).expect("Failed to load shader");
 
+        info!("Creating deferred render pipeline");
         let deferred_render_pipeline = {
             let shader = wgpu::ShaderModuleDescriptor {
                 label: Some("Normal Shader"),
@@ -340,6 +365,7 @@ impl<'a> State<'a> {
             )
         };
 
+        info!("Creating light render pipeline");
         let light_render_pipeline = {
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Light pipeline layout desc"),
@@ -425,6 +451,7 @@ impl<'a> State<'a> {
         let shader_buffer = FileReader::read_file("shaders/draw_deferred.wgsl").await;
         let shader_str =
             std::str::from_utf8(shader_buffer.as_slice()).expect("Failed to load shader");
+        info!("Creating output render pipeline");
 
         let output_render_pipeline = {
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -506,6 +533,7 @@ impl<'a> State<'a> {
             }
         };
 
+        info!("State ctor completed");
         Self {
             surface,
             device,
@@ -643,6 +671,7 @@ impl<'a> State<'a> {
                             load: wgpu::LoadOp::Clear(self.bg_color),
                             store: wgpu::StoreOp::Store,
                         },
+                        depth_slice: None,
                     }),
                     Some(wgpu::RenderPassColorAttachment {
                         view: &self.render_material.textures["ss_specular"].view,
@@ -651,6 +680,7 @@ impl<'a> State<'a> {
                             load: wgpu::LoadOp::Clear(self.bg_color),
                             store: wgpu::StoreOp::Store,
                         },
+                        depth_slice: None,
                     }),
                 ],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
@@ -696,6 +726,7 @@ impl<'a> State<'a> {
                         load: wgpu::LoadOp::Clear(self.bg_color),
                         store: wgpu::StoreOp::Store,
                     },
+                    depth_slice: None,
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
