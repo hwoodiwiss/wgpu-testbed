@@ -17,7 +17,7 @@ cgmath = "0.18"
 env_logger = "0.11.6"
 log = "0.4"
 futures = "0.3"
-wgpu = { version = "27.0.1", features = ["std"] }
+wgpu = { version = "28.0.0", features = ["std"] }
 bytemuck = { version = "1.24.0", features = ["derive"] }
 anyhow = "1.0"
 tobj = { version = "4.0.3", features = ["futures"] }
