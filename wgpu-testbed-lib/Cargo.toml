@@ -18,7 +18,7 @@ env_logger = "0.11.6"
 log = "0.4"
 futures = "0.3"
 wgpu = { version = "28.0.0", features = ["std"] }
-bytemuck = { version = "1.24.0", features = ["derive"] }
+bytemuck = { version = "1.25.0", features = ["derive"] }
 anyhow = "1.0"
 tobj = { version = "4.0.3", features = ["futures"] }
 
@@ -27,7 +27,7 @@ wasm-bindgen = "0.2"
 js-sys = "0.3.74"
 web-sys = { version = "0.3.72", features = ["Response"] }
 console_error_panic_hook = "0.1.6"
-wasm-bindgen-futures = "0.4.58"
+wasm-bindgen-futures = "0.4.62"
 # Fixes getrandom, used by tobj, requiring the js feature for wasm32-unkown-unknown targets
 getrandom = { version = "0.2.17", features = ["js"] }
 
