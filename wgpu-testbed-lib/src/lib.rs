@@ -99,7 +99,7 @@ pub async fn run() {
                     {
                         use winit::platform::web::WindowExtWebSys;
 
-                        if (new_size.width > 0 && new_size.height > 0) {
+                        if new_size.width > 0 && new_size.height > 0 {
                             let canvas = window.canvas().expect("Could not get canvas reference");
                             canvas
                                 .set_attribute("style", "width: 100%; aspect-ratio: auto;")
