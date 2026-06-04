@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::mpsc;
 
 use crate::camera::CameraController;
 use crate::file_reader::FileReader;
@@ -12,7 +14,11 @@ use cgmath::*;
 
 use log::info;
 use wgpu::util::DeviceExt;
-use wgpu::{ExperimentalFeatures, InstanceDescriptor, PowerPreference, SamplerBindingType};
+use wgpu::{
+    ExperimentalFeatures, InstanceDescriptor, PowerPreference, SamplerBindingType,
+    TexelCopyBufferInfo, TexelCopyTextureInfo,
+};
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::{event::WindowEvent, window::Window};
 
 use crate::camera::Camera;
@@ -38,6 +44,17 @@ const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
 );
 
 const RENDER_SCALE: f32 = 2.0;
+
+pub struct MappedTextureView {
+    pub data: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+    pub unpadded_bytes_per_row: u32,
+    pub padded_bytes_per_row: u32,
+    pub format: wgpu::TextureFormat,
+    pub name: String,
+}
+
 pub struct State<'a> {
     surface: wgpu::Surface<'a>,
     device: wgpu::Device,
@@ -62,10 +79,17 @@ pub struct State<'a> {
     light_bind_group: wgpu::BindGroup,
     light_render_pipeline: wgpu::RenderPipeline,
     output_render_pipeline: wgpu::RenderPipeline,
+    capture_next_frame: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    data_export: mpsc::Sender<MappedTextureView>,
 }
 
 impl<'a> State<'a> {
-    pub async fn new(window: Arc<Window>) -> Self {
+    pub async fn new(
+        window: Arc<Window>,
+        #[cfg(not(target_arch = "wasm32"))]
+        data_export: mpsc::Sender<MappedTextureView>,
+    ) -> Self {
         let size = window.inner_size();
 
         #[cfg(target_arch = "wasm32")]
@@ -81,17 +105,20 @@ impl<'a> State<'a> {
         }
 
         // This is possibly specific to my WoA laptop, the Vulkan driver seems to be broken, so I'm seeing access violations.
-        let supported_backends = if cfg!(all(target_arch = "aarch64", target_os = "windows")) { 
-            wgpu::Backends::DX12 
+        let supported_backends = if cfg!(all(target_arch = "aarch64", target_os = "windows")) {
+            wgpu::Backends::DX12
         } else {
             wgpu::Backends::all()
         };
 
         let instance_desc = InstanceDescriptor {
             backends: supported_backends,
-            ..Default::default()
+            flags: wgpu::InstanceFlags::from_env_or_default(),
+            memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
+            backend_options: wgpu::BackendOptions::from_env_or_default(),
+            display: None,
         };
-        let instance = wgpu::Instance::new(&instance_desc);
+        let instance = wgpu::Instance::new(instance_desc);
         let surface = instance
             .create_surface(window.clone())
             .expect("Expected surface from window");
@@ -106,16 +133,14 @@ impl<'a> State<'a> {
             .expect("Could not create adapter instance!");
 
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    memory_hints: wgpu::MemoryHints::Performance,
-                    experimental_features: ExperimentalFeatures::disabled(),
-                    trace: wgpu::Trace::Off,
-                },
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: wgpu::MemoryHints::Performance,
+                experimental_features: ExperimentalFeatures::disabled(),
+                trace: wgpu::Trace::Off,
+            })
             .await
             .expect("Could not get device from adapter!");
 
@@ -129,7 +154,7 @@ impl<'a> State<'a> {
         });
 
         let surface_format = capabilities.formats[0];
-        info!("Selected surface format: {:?}", surface_format);        
+        info!("Selected surface format: {:?}", surface_format);
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -273,11 +298,11 @@ impl<'a> State<'a> {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[
-                    &texture_bind_group_layout,
-                    &uniform_bind_group_layout,
-                    &light_bind_group_layout,
+                    Some(&texture_bind_group_layout),
+                    Some(&uniform_bind_group_layout),
+                    Some(&light_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         let model_loader = ModelLoader::new(&device).await;
@@ -369,8 +394,11 @@ impl<'a> State<'a> {
         let light_render_pipeline = {
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Light pipeline layout desc"),
-                bind_group_layouts: &[&uniform_bind_group_layout, &light_bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[
+                    Some(&uniform_bind_group_layout),
+                    Some(&light_bind_group_layout),
+                ],
+                immediate_size: 0,
             });
             let shader_buffer = FileReader::read_file("shaders/light.wgsl").await;
             let shader_str =
@@ -456,8 +484,8 @@ impl<'a> State<'a> {
         let output_render_pipeline = {
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Deferred pipeline layout desc"),
-                bind_group_layouts: &[&output_bindgroup_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&output_bindgroup_layout)],
+                immediate_size: 0,
             });
 
             let shader = wgpu::ShaderModuleDescriptor {
@@ -558,6 +586,9 @@ impl<'a> State<'a> {
             output_render_pipeline,
             screen_quad,
             render_material,
+            capture_next_frame: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            data_export,
         }
     }
 
@@ -624,7 +655,20 @@ impl<'a> State<'a> {
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
-        self.camera_controller.process_inputs(event)
+        self.camera_controller.process_inputs(event) || self.process_inputs(event)
+    }
+
+    fn process_inputs(&mut self, event: &WindowEvent) -> bool {
+        if let WindowEvent::KeyboardInput { event: key, .. } = event {
+            if let PhysicalKey::Code(code) = key.physical_key {
+                if code == KeyCode::Backspace && key.state.is_pressed() {
+                    self.capture_next_frame = true;
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     pub fn update(&mut self) {
@@ -645,8 +689,22 @@ impl<'a> State<'a> {
         );
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let frame = self.surface.get_current_texture()?;
+    pub fn render(&mut self) {
+        let frame = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(surface_texture) => surface_texture,
+            wgpu::CurrentSurfaceTexture::Lost
+            | wgpu::CurrentSurfaceTexture::Outdated
+            | wgpu::CurrentSurfaceTexture::Suboptimal(_) => {
+                self.resize(self.size);
+                return;
+            }
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+                return;
+            }
+            wgpu::CurrentSurfaceTexture::Validation => {
+                panic!("Validation error when acquiring next surface texture!")
+            }
+        };
 
         let mut encoder = self
             .device
@@ -696,6 +754,7 @@ impl<'a> State<'a> {
                 }),
                 timestamp_writes: None,
                 occlusion_query_set: None,
+                multiview_mask: None,
             });
             render_pass.set_stencil_reference(32);
             render_pass.set_pipeline(&self.light_render_pipeline);
@@ -716,9 +775,19 @@ impl<'a> State<'a> {
             );
         }
 
+        if self.capture_next_frame {
+            let diffuse_texture = &self.render_material.textures["ss_diffuse"].texture;
+            self.read_texture_to_cpu(diffuse_texture, "ss_diffuse");
+
+            let specular_texture = &self.render_material.textures["ss_specular"].texture;
+            self.read_texture_to_cpu(specular_texture, "ss_specular");
+
+            self.capture_next_frame = false;
+        }
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Frame render pass"),
+                label: Some("Post render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &frame_view,
                     resolve_target: None,
@@ -731,6 +800,7 @@ impl<'a> State<'a> {
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
+                multiview_mask: None,
             });
 
             render_pass.set_pipeline(&self.output_render_pipeline);
@@ -746,6 +816,211 @@ impl<'a> State<'a> {
 
         self.queue.submit(std::iter::once(encoder.finish()));
         frame.present();
-        Ok(())
     }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn read_texture_to_cpu(&self, texture: &wgpu::Texture, name: &str) {
+        let texture_copy_info = TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        };
+
+        let width = texture.size().width;
+        let height = texture.size().height;
+        let format = texture.format();
+        let bytes_per_pixel = format.block_copy_size(None).unwrap_or(4);
+
+        let unpadded_bytes_per_row = width * bytes_per_pixel;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+        let padded_bytes_per_row = (unpadded_bytes_per_row + align - 1) & !(align - 1);
+
+        let buffer_size = padded_bytes_per_row as u64 * height as u64;
+
+        let copy_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Copy Buffer"),
+            size: buffer_size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let copy_layout = wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(padded_bytes_per_row),
+            rows_per_image: Some(height),
+        };
+
+        let buffer_copy_info = TexelCopyBufferInfo {
+            buffer: &copy_buffer,
+            layout: copy_layout,
+        };
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Texture read encoder"),
+            });
+
+        encoder.copy_texture_to_buffer(texture_copy_info, buffer_copy_info, texture.size());
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        let capturable = copy_buffer.clone();
+        let sender = self.data_export.clone();
+        let name = name.to_owned();
+        copy_buffer.map_async(wgpu::MapMode::Read, 0..buffer_size, move |result| {
+            if let Ok(()) = result {
+                let data = capturable.slice(..).get_mapped_range();
+                sender
+                    .send(MappedTextureView {
+                        data: data.to_vec(),
+                        width,
+                        height,
+                        unpadded_bytes_per_row,
+                        padded_bytes_per_row,
+                        format,
+                        name,
+                    })
+                    .unwrap();
+                drop(data);
+                capturable.unmap();
+            }
+        });
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn read_texture_to_cpu(&self, texture: &wgpu::Texture, name: &str) {
+        let texture_copy_info = TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        };
+
+        let width = texture.size().width;
+        let height = texture.size().height;
+        let format = texture.format();
+        let bytes_per_pixel = format.block_copy_size(None).unwrap_or(4);
+
+        let unpadded_bytes_per_row = width * bytes_per_pixel;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+        let padded_bytes_per_row = (unpadded_bytes_per_row + align - 1) & !(align - 1);
+
+        let buffer_size = padded_bytes_per_row as u64 * height as u64;
+
+        let copy_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Copy Buffer"),
+            size: buffer_size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let copy_layout = wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(padded_bytes_per_row),
+            rows_per_image: Some(height),
+        };
+
+        let buffer_copy_info = TexelCopyBufferInfo {
+            buffer: &copy_buffer,
+            layout: copy_layout,
+        };
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Texture read encoder"),
+            });
+
+        encoder.copy_texture_to_buffer(texture_copy_info, buffer_copy_info, texture.size());
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        let capturable = copy_buffer.clone();
+        let name = name.to_owned();
+        copy_buffer.map_async(wgpu::MapMode::Read, 0..buffer_size, move |result| {
+            if let Ok(()) = result {
+                let raw = capturable.slice(..).get_mapped_range();
+
+                // Strip row padding
+                let mut pixels: Vec<u8> =
+                    Vec::with_capacity((unpadded_bytes_per_row * height) as usize);
+                for row in 0..height {
+                    let start = (row * padded_bytes_per_row) as usize;
+                    let end = start + unpadded_bytes_per_row as usize;
+                    pixels.extend_from_slice(&raw[start..end]);
+                }
+                drop(raw);
+                capturable.unmap();
+
+                // Convert BGRA → RGBA for DX12/Vulkan surface formats
+                match format {
+                    wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
+                        for chunk in pixels.chunks_mut(4) {
+                            chunk.swap(0, 2);
+                        }
+                    }
+                    _ => {}
+                }
+
+                // Encode PNG into an in-memory buffer
+                let mut png_bytes: Vec<u8> = Vec::new();
+                {
+                    use image::ImageEncoder;
+                    let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+                    if let Err(e) = encoder.write_image(
+                        &pixels,
+                        width,
+                        height,
+                        image::ExtendedColorType::Rgba8,
+                    ) {
+                        web_sys::console::error_1(
+                            &format!("Screenshot PNG encode failed: {e}").into(),
+                        );
+                        return;
+                    }
+                }
+
+                // Trigger a browser download
+                if let Err(e) = trigger_browser_download(&png_bytes, &format!("{name}.png")) {
+                    web_sys::console::error_1(
+                        &format!("Screenshot download failed: {e:?}").into(),
+                    );
+                }
+            }
+        });
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn trigger_browser_download(data: &[u8], filename: &str) -> Result<(), wasm_bindgen::JsValue> {
+    use js_sys::{Array, Uint8Array};
+    use wasm_bindgen::JsCast;
+    use web_sys::{Blob, BlobPropertyBag, HtmlAnchorElement, Url};
+
+    let uint8_array = Uint8Array::from(data);
+    let array = Array::new();
+    array.push(&uint8_array.buffer());
+
+    let options = BlobPropertyBag::new();
+    options.set_type("image/png");
+
+    let blob = Blob::new_with_u8_array_sequence_and_options(&array, &options)?;
+    let url = Url::create_object_url_with_blob(&blob)?;
+
+    let window = web_sys::window().ok_or_else(|| wasm_bindgen::JsValue::from_str("no window"))?;
+    let document = window
+        .document()
+        .ok_or_else(|| wasm_bindgen::JsValue::from_str("no document"))?;
+
+    let anchor: HtmlAnchorElement = document
+        .create_element("a")?
+        .dyn_into()?;
+    anchor.set_href(&url);
+    anchor.set_download(filename);
+    anchor.click();
+
+    Url::revoke_object_url(&url)?;
+    Ok(())
 }

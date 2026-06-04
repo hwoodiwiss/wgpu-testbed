@@ -213,7 +213,7 @@ impl ModelLoader {
 
         let pipeline = pipeline::create_compute_pipeline(
             device,
-            &[&binder.layout],
+            &[Some(&binder.layout)],
             shader,
             Some("ModelLoader Compute Pipeline"),
         );
@@ -246,7 +246,8 @@ impl ModelLoader {
                         .join(path)
                         .to_str()
                         .expect("Could not convert material path to &str"),
-                ).await;
+                )
+                .await;
                 tobj::load_mtl_buf(&mut mtl_data.as_slice())
             },
         )
@@ -411,7 +412,10 @@ impl ModelLoader {
             }
             queue.submit(std::iter::once(encoder.finish()));
             if let Err(e) = device.poll(wgpu::PollType::Poll) {
-                return Err(anyhow!("Error during compute bitangent calculation: {:?}", e));
+                return Err(anyhow!(
+                    "Error during compute bitangent calculation: {:?}",
+                    e
+                ));
             }
 
             meshes.push(Mesh {
