@@ -48,7 +48,6 @@ pub fn create_render_pipeline(
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label,
         layout: Some(layout),
-        multiview: None,
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vertex_main"),
@@ -76,8 +75,8 @@ pub fn create_render_pipeline(
         },
         depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
             format,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::LessEqual,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::LessEqual),
             stencil: wgpu::StencilState {
                 front: wgpu::StencilFaceState {
                     compare: wgpu::CompareFunction::Always,
@@ -102,12 +101,13 @@ pub fn create_render_pipeline(
             alpha_to_coverage_enabled: false,
         },
         cache: None,
+        multiview_mask: None,
     })
 }
 
 pub fn create_compute_pipeline(
     device: &wgpu::Device,
-    bind_group_layouts: &[&wgpu::BindGroupLayout],
+    bind_group_layouts: &[Option<&wgpu::BindGroupLayout>],
     shader: wgpu::ShaderModuleDescriptor,
     label: Option<&str>,
 ) -> wgpu::ComputePipeline {
@@ -116,7 +116,7 @@ pub fn create_compute_pipeline(
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label,
         bind_group_layouts,
-        push_constant_ranges: &[],
+        immediate_size: 0,
     });
 
     device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {

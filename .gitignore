@@ -3,6 +3,7 @@
 **.sublime-project
 **.sublime-workspace
 /.vscode
+/*.png
 
 # Added by cargo
 #
