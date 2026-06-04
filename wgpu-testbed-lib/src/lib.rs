@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::mpsc;
 
 #[cfg(target_arch = "wasm32")]
 use std::cell::RefCell;
@@ -19,7 +21,9 @@ use winit::{
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use crate::state::{MappedTextureView, State};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::state::MappedTextureView;
+use crate::state::State;
 
 mod camera;
 mod file_reader;
@@ -35,7 +39,9 @@ mod vertex;
 struct App {
     window: Option<Arc<Window>>,
     state: Option<State<'static>>,
+    #[cfg(not(target_arch = "wasm32"))]
     texture_copy_sender: Option<mpsc::Sender<MappedTextureView>>,
+    #[cfg(not(target_arch = "wasm32"))]
     screenshot_writer: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -44,7 +50,9 @@ impl App {
         Self {
             window: None,
             state: None,
+            #[cfg(not(target_arch = "wasm32"))]
             texture_copy_sender: None,
+            #[cfg(not(target_arch = "wasm32"))]
             screenshot_writer: None,
         }
     }
@@ -67,52 +75,60 @@ impl ApplicationHandler for App {
                 .expect("Failed to create window!"),
         );
 
-        let (texture_copy_sender, texture_copy_receiver) = mpsc::channel();
-        self.texture_copy_sender = Some(texture_copy_sender);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let (texture_copy_sender, texture_copy_receiver) = mpsc::channel();
+            self.texture_copy_sender = Some(texture_copy_sender);
 
-        self.screenshot_writer = Some(std::thread::spawn({
-            let receiver = texture_copy_receiver;
-            move || {
-                let mut counter = 0u32;
-                while let Ok(mapped_view) = receiver.recv() {
-                    // Strip row padding — each row in the buffer may have trailing bytes
-                    // to satisfy wgpu's COPY_BYTES_PER_ROW_ALIGNMENT (256-byte) requirement.
-                    let mut pixels: Vec<u8> = Vec::with_capacity(
-                        (mapped_view.unpadded_bytes_per_row * mapped_view.height) as usize,
-                    );
-                    for row in 0..mapped_view.height {
-                        let start = (row * mapped_view.padded_bytes_per_row) as usize;
-                        let end = start + mapped_view.unpadded_bytes_per_row as usize;
-                        pixels.extend_from_slice(&mapped_view.data[start..end]);
-                    }
-
-                    // Convert BGRA → RGBA if the surface format is BGRA (common on DX12/Windows).
-                    match mapped_view.format {
-                        wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
-                            for chunk in pixels.chunks_mut(4) {
-                                chunk.swap(0, 2);
-                            }
+            self.screenshot_writer = Some(std::thread::spawn({
+                let receiver = texture_copy_receiver;
+                move || {
+                    let mut counter = 0u32;
+                    while let Ok(mapped_view) = receiver.recv() {
+                        // Strip row padding — each row in the buffer may have trailing bytes
+                        // to satisfy wgpu's COPY_BYTES_PER_ROW_ALIGNMENT (256-byte) requirement.
+                        let mut pixels: Vec<u8> = Vec::with_capacity(
+                            (mapped_view.unpadded_bytes_per_row * mapped_view.height) as usize,
+                        );
+                        for row in 0..mapped_view.height {
+                            let start = (row * mapped_view.padded_bytes_per_row) as usize;
+                            let end = start + mapped_view.unpadded_bytes_per_row as usize;
+                            pixels.extend_from_slice(&mapped_view.data[start..end]);
                         }
-                        _ => {}
-                    }
 
-                    let filename = format!("screenshot_{:04}_{}.png", counter, mapped_view.name);
-                    counter += 1;
+                        // Convert BGRA → RGBA if the surface format is BGRA (common on DX12/Windows).
+                        match mapped_view.format {
+                            wgpu::TextureFormat::Bgra8Unorm
+                            | wgpu::TextureFormat::Bgra8UnormSrgb => {
+                                for chunk in pixels.chunks_mut(4) {
+                                    chunk.swap(0, 2);
+                                }
+                            }
+                            _ => {}
+                        }
 
-                    match image::RgbaImage::from_raw(mapped_view.width, mapped_view.height, pixels)
-                    {
-                        Some(img) => match img.save(&filename) {
-                            Ok(_) => println!("Saved {}", filename),
-                            Err(e) => eprintln!("Failed to save {}: {}", filename, e),
-                        },
-                        None => eprintln!(
-                            "Buffer size mismatch for {} ({}x{})",
-                            filename, mapped_view.width, mapped_view.height
-                        ),
+                        let filename =
+                            format!("screenshot_{:04}_{}.png", counter, mapped_view.name);
+                        counter += 1;
+
+                        match image::RgbaImage::from_raw(
+                            mapped_view.width,
+                            mapped_view.height,
+                            pixels,
+                        ) {
+                            Some(img) => match img.save(&filename) {
+                                Ok(_) => println!("Saved {}", filename),
+                                Err(e) => eprintln!("Failed to save {}: {}", filename, e),
+                            },
+                            None => eprintln!(
+                                "Buffer size mismatch for {} ({}x{})",
+                                filename, mapped_view.width, mapped_view.height
+                            ),
+                        }
                     }
                 }
-            }
-        }));
+            }));
+        }
 
         #[cfg(target_arch = "wasm32")]
         {
@@ -136,20 +152,14 @@ impl ApplicationHandler for App {
 
         self.window = Some(window.clone());
 
-        // #[cfg(not(target_arch = "wasm32"))]
-        // {
-        //     let state = futures::executor::block_on(State::new(
-        //         window,
-        //         &self.texture_copy_sender.unwrap().clone(),
-        //     ));
-        //     self.state = Some(state);
-        // }
-
-        let state = futures::executor::block_on(State::new(
-            window,
-            self.texture_copy_sender.as_ref().unwrap().clone(),
-        ));
-        self.state = Some(state);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let state = futures::executor::block_on(State::new(
+                window,
+                self.texture_copy_sender.as_ref().unwrap().clone(),
+            ));
+            self.state = Some(state);
+        }
 
         #[cfg(target_arch = "wasm32")]
         {
@@ -160,7 +170,7 @@ impl ApplicationHandler for App {
             // which outlives the spawn. We use a shared Rc so the closure can store it.
             let state_cell_clone = state_cell.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let state = State::new(window, self.texture_copy_sender.as_ref().unwrap().clone()).await;
+                let state = State::new(window).await;
                 *state_cell_clone.borrow_mut() = Some(state);
             });
             // Replace self.state with the cell's contents once filled; for wasm

@@ -5,7 +5,7 @@
 cargo clippy -- -D warnings
 
 Push-Location ".\wgpu-testbed-lib"
-$env:RUSTFLAGS = "--cfg=web_sys_unstable_apis"
+$env:RUSTFLAGS = '--cfg=web_sys_unstable_apis --cfg getrandom_backend="wasm_js"'
 wasm-pack build --release
 Pop-Location
 
