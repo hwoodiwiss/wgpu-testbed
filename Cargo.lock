@@ -2012,9 +2012,9 @@ dependencies = [
 
 [[package]]
 name = "tobj"
-version = "4.0.4"
+version = "4.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2da83817ac7401436633efc35c19edae9f326fa741fae775a1caa406de9db07c"
+checksum = "6eb8e04167c1c0c76b5de63226fd733485ad63ef71e40de31e16272f47b099e2"
 dependencies = [
  "ahash",
  "futures-lite",
