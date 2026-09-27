@@ -12,9 +12,8 @@ use std::rc::Rc;
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
-    event::{ElementState, WindowEvent},
+    event::{DeviceEvent, DeviceId, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
-    keyboard::{Key, NamedKey},
     window::{Window, WindowId},
 };
 
@@ -59,6 +58,14 @@ impl App {
 }
 
 impl ApplicationHandler for App {
+    fn device_event(&mut self, _event_loop: &ActiveEventLoop, _device_id: DeviceId, event: DeviceEvent) {
+        if let Some(state) = self.state.as_mut() { state.device_input(&event); }
+    }
+
+    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
+        if let Some(state) = self.state.as_mut() { state.deactivate_navigation(); }
+    }
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
             return;
@@ -198,6 +205,10 @@ impl ApplicationHandler for App {
                     }
                 }
             });
+            // Layout events can arrive while asynchronous GPU initialization is pending.
+            if let (Some(state), Some(window)) = (self.state.as_mut(), self.window.as_ref()) {
+                state.resize(window.inner_size());
+            }
         }
 
         let (Some(state), Some(window)) = (self.state.as_mut(), self.window.as_ref()) else {
@@ -227,16 +238,6 @@ impl ApplicationHandler for App {
             WindowEvent::ScaleFactorChanged { .. } => {
                 state.resize(window.inner_size());
             }
-            WindowEvent::KeyboardInput {
-                event: ref key_event,
-                ..
-            } if key_event.state == ElementState::Pressed => {
-                if let Key::Named(key) = key_event.logical_key {
-                    if key == NamedKey::Escape {
-                        event_loop.exit();
-                    }
-                }
-            }
             WindowEvent::RedrawRequested => {
                 state.update();
                 state.render();
@@ -261,11 +262,27 @@ thread_local! {
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub fn run_wasm() {
-    use std::panic;
-
-    panic::set_hook(Box::new(console_error_panic_hook::hook));
-    run();
+    use winit::platform::web::EventLoopExtWebSys;
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    let evt_loop = EventLoop::new().expect("Failed to create event loop!");
+    evt_loop.spawn_app(App::new());
 }
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn set_navigation_settings(json: &str) -> Result<(), JsValue> { scene_navigation::web::settings(json) }
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn navigation_command(action: &str) -> Result<(), JsValue> { scene_navigation::web::command(action) }
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn navigation_status() -> String { scene_navigation::web::status() }
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn set_navigation_bindings(json: &str) -> Result<(), JsValue> { scene_navigation::web::bindings(json) }
 
 pub fn run() {
     env_logger::init();

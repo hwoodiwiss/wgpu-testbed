@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/scene-navigation",
     "wgpu-testbed-lib",
     "wgpu-testbed-app",
 ]

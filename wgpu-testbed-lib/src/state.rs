@@ -18,7 +18,6 @@ use wgpu::{
     ExperimentalFeatures, InstanceDescriptor, PowerPreference, SamplerBindingType,
     TexelCopyBufferInfo, TexelCopyTextureInfo,
 };
-use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::{event::WindowEvent, window::Window};
 
 use crate::camera::Camera;
@@ -90,7 +89,9 @@ impl<'a> State<'a> {
         #[cfg(not(target_arch = "wasm32"))]
         data_export: mpsc::Sender<MappedTextureView>,
     ) -> Self {
-        let size = window.inner_size();
+        let mut size = window.inner_size();
+        size.width = size.width.max(1);
+        size.height = size.height.max(1);
 
         #[cfg(target_arch = "wasm32")]
         {
@@ -209,7 +210,7 @@ impl<'a> State<'a> {
                 ],
             });
 
-        let camera = Camera {
+        let mut camera = Camera {
             eye: (0.0, 1.0, 2.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: (0.0, 1.0, 0.0).into(),
@@ -219,7 +220,7 @@ impl<'a> State<'a> {
             z_far: 1000.0,
         };
 
-        let camera_controller = CameraController::new(0.2);
+        let mut camera_controller = CameraController::new(window.clone(), &camera, 0.2);
 
         let mut uniforms = Uniforms::new();
         uniforms.update_view_proj(&camera);
@@ -341,6 +342,17 @@ impl<'a> State<'a> {
             .collect::<Vec<_>>();
 
         let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+
+        if let Some(bounds) = obj_model.bounds {
+            let centers: Vec<_> = instances.iter().map(|instance| {
+                instance.position + instance.rotation * bounds.center.to_vec()
+            }).collect();
+            let center = centers.iter().copied().fold(Vector3::zero(), |a, b| a + b) / centers.len().max(1) as f32;
+            let radius = centers.iter().map(|p| (*p - center).magnitude() + bounds.radius).fold(0.0_f32, f32::max);
+            if let Some(bounds) = scene_navigation::Bounds::new(center.into(), radius) {
+                camera_controller.set_bounds(bounds, &mut camera, false);
+            }
+        }
 
         info!("Creating instance buffer");
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -593,6 +605,7 @@ impl<'a> State<'a> {
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        if new_size.width == 0 || new_size.height == 0 { return; }
         self.size = new_size;
         self.surface_config.width = self.size.width;
         self.surface_config.height = self.size.height;
@@ -655,21 +668,14 @@ impl<'a> State<'a> {
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
-        self.camera_controller.process_inputs(event) || self.process_inputs(event)
+        self.camera_controller.process_inputs(event)
     }
 
-    fn process_inputs(&mut self, event: &WindowEvent) -> bool {
-        if let WindowEvent::KeyboardInput { event: key, .. } = event {
-            if let PhysicalKey::Code(code) = key.physical_key {
-                if code == KeyCode::Backspace && key.state.is_pressed() {
-                    self.capture_next_frame = true;
-                    return true;
-                }
-            }
-        }
-
-        false
+    pub fn device_input(&mut self, event: &winit::event::DeviceEvent) {
+        self.camera_controller.device_event(event);
     }
+
+    pub fn deactivate_navigation(&mut self) { self.camera_controller.deactivate(); }
 
     pub fn update(&mut self) {
         let old_position: cgmath::Vector3<_> = self.light.position.into();
@@ -680,7 +686,7 @@ impl<'a> State<'a> {
         self.queue
             .write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light]));
 
-        self.camera_controller.update_camera(&mut self.camera);
+        self.capture_next_frame |= self.camera_controller.update_camera(&mut self.camera);
         self.uniforms.update_view_proj(&self.camera);
         self.queue.write_buffer(
             &self.uniform_buffer,

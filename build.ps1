@@ -2,16 +2,28 @@
 #Requires -Version 7.0
 #Requires -PSEdition Core
 
-cargo clippy -- -D warnings
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$originalRustFlags = $env:RUSTFLAGS
+$originalEncodedRustFlags = $env:CARGO_ENCODED_RUSTFLAGS
+try {
+$env:RUSTFLAGS = $null
+$env:CARGO_ENCODED_RUSTFLAGS = $null
+cargo clippy --workspace --all-targets -- -D warnings
 
 Push-Location ".\wgpu-testbed-lib"
-$env:RUSTFLAGS = '--cfg=web_sys_unstable_apis --cfg getrandom_backend="wasm_js"'
+try {
 wasm-pack build --release
-Pop-Location
+} finally { Pop-Location }
 
 Push-Location ".\wgpu-testbed-webapp"
+try {
 Remove-Item "./node_modules" -Recurse -ErrorAction SilentlyContinue
 Remove-Item "./dist" -Recurse -ErrorAction SilentlyContinue
 npm i
 npm run build
-Pop-Location
+} finally { Pop-Location }
+} finally {
+    $env:RUSTFLAGS = $originalRustFlags
+    $env:CARGO_ENCODED_RUSTFLAGS = $originalEncodedRustFlags
+}

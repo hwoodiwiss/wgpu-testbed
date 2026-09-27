@@ -3,12 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <title>Hugo Woodiwiss | WGPU Testbed Web</title>
+    <style>body { background: #1e1e1e; color: #ddd; font-family: system-ui, sans-serif; } canvas:focus { outline: 2px solid #8bf; } #navigation { display: flex; gap: 1rem; align-items: center; }</style>
   </head>
   <body>
     <noscript
       >This page contains webassembly and javascript content, please enable
       javascript in your browser.</noscript
     >
+    <div id="navigation">
+      <label>Speed (units/s): <input id="nav-speed" type="number" min="0.001" value="12" /></label>
+      <label>Mode: <select id="nav-mode"><option>Fly</option><option>Orbit</option></select></label>
+      <button id="nav-frame">Frame scene</button><button id="nav-reset">Reset view</button>
+    </div>
+    <p id="nav-status" role="status">Initializing navigation…</p>
+    <details><summary>Navigation controls</summary><p id="nav-help"></p></details>
     <script src="./bootstrap.js"></script>
   </body>
 </html>

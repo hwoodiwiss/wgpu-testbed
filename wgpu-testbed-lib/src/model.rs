@@ -191,6 +191,7 @@ impl pipeline::Bindable for BitangentComputeBinding {
 pub struct Model {
     pub meshes: Vec<Mesh>,
     pub materials: Vec<Material>,
+    pub bounds: Option<scene_navigation::Bounds>,
 }
 
 pub struct ModelLoader {
@@ -332,10 +333,17 @@ impl ModelLoader {
         }
 
         let mut meshes = Vec::new();
+        let mut min = [f32::INFINITY; 3];
+        let mut max = [f32::NEG_INFINITY; 3];
 
         for model in obj_models {
             let mut vertices = Vec::with_capacity(model.mesh.positions.len() / 3);
             for i in 0..model.mesh.positions.len() / 3 {
+                for axis in 0..3 {
+                    let value = model.mesh.positions[i * 3 + axis];
+                    min[axis] = min[axis].min(value);
+                    max[axis] = max[axis].max(value);
+                }
                 vertices.push(ModelVertex {
                     position: [
                         model.mesh.positions[i * 3],
@@ -427,7 +435,10 @@ impl ModelLoader {
             });
         }
 
-        Ok(Model { meshes, materials })
+        let center = std::array::from_fn(|axis| (min[axis] + max[axis]) * 0.5);
+        let radius = (0..3).map(|axis| ((max[axis] - min[axis]) * 0.5).powi(2)).sum::<f32>().sqrt();
+        let bounds = scene_navigation::Bounds::new(center, radius);
+        Ok(Model { meshes, materials, bounds })
     }
 
     pub fn create_screen_quad_mesh(device: &wgpu::Device) -> Mesh {
