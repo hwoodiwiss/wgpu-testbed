@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Testbed navigation test host</title>
+  </head>
+  <body>
+    <label>Host field <input id="host-field" /></label>
+    <script type="module">
+      import init, * as wasm from "/pkg-web/wgpu_testbed_lib.js";
+      await init();
+      window.sceneViewer = wasm;
+      wasm.run_wasm();
+    </script>
+  </body>
+</html>

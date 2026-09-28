@@ -26,8 +26,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - uses: browser-actions/setup-chrome@v2
-        id: chrome
       - run: cargo install wasm-pack --locked
       - run: wasm-pack build --release --target web --out-dir pkg-web
         working-directory: wgpu-testbed-lib
@@ -35,14 +33,17 @@ jobs:
         working-directory: wgpu-testbed-lib
       - run: npm ci
         working-directory: wgpu-testbed-webapp
+      - run: npx playwright install chromium
+        working-directory: wgpu-testbed-webapp
       - run: npm run build
         working-directory: wgpu-testbed-webapp
       - run: npm run test:navigation
         working-directory: wgpu-testbed-webapp
-        env:
-          BROWSER_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
-      - run: npm run test:navigation
-        working-directory: wgpu-testbed-webapp
-        env:
-          BROWSER_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
-          WASM_HOST: bundler
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-navigation
+          path: |
+            wgpu-testbed-webapp/playwright-report/
+            wgpu-testbed-webapp/test-results/
+          retention-days: 14
